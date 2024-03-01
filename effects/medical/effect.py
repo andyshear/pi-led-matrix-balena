@@ -3,7 +3,7 @@
 def run(matrix, config):
     """red, yellow, repeat"""
     while matrix.ready():
-        matrix.reset(matrix.color('red'))
+        matrix.reset(matrix.color(0,0,255))
         matrix.show()
         matrix.delay(500)
 
