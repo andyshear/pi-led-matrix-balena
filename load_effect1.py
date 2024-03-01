@@ -1,26 +1,22 @@
-import os
 import sys
-import json
-import inspect
-from src.led_matrix import Matrix, pixel_height, pixel_width
+from lights.effect import apply_effect, effect_caution, effect_clear, effect_medical, effect_lastLap, swap_rgb_color
+from your_matrix_library import Matrix # Import or define your matrix manipulation class
 
-effect_module  = 'effects/' + sys.argv[1]
-sys.path.append(effect_module)
-effect_dir = os.path.realpath(
-    os.path.abspath(
-        os.path.join(os.path.split(inspect.getfile( inspect.currentframe() ))[0], effect_module)
-    )
-)
-sys.path.insert(0, effect_dir)
-print("Starting: " + effect_module)
-argv_json = json.dumps(sys.argv[2:])
-print('Playlist JSON: {"effect": "marquee", "argv": ' + argv_json + '}')
-import effect # pylint: disable=wrong-import-position, wrong-import-order
-matrix = Matrix()
+# Assume the first argument is the effect name
+effect_name = sys.argv[1]
 
-effect.run(matrix, {
-    'pixel_height': pixel_height,
-    'pixel_width': pixel_width,
-    'effect_dir': effect_dir,
-    'argv': sys.argv[2:],
-})
+# Initialize your matrix here
+matrix = Matrix()  # This should be an instance of your matrix manipulation class
+config = {}  # Any configuration needed
+
+effects = {
+    'caution': effect_caution,
+    'clear': effect_clear,
+    # Add more effects here
+}
+
+if effect_name in effects:
+    apply_effect(matrix, effects[effect_name], config)
+    swap_rgb_color(matrix)
+else:
+    print(f"Unknown effect: {effect_name}")
