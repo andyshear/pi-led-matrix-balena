@@ -11,6 +11,6 @@ def run(matrix, config):
         matrix.show()
         matrix.delay(500)
 
-        matrix.text('MEDICAL', (10,20), 16, (255,0,0))
-        matrix.show()
-        matrix.delay(1000)
+        # matrix.text('MEDICAL', (10,20), 16, (255,0,0))
+        # matrix.show()
+        # matrix.delay(1000)
