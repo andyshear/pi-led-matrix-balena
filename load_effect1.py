@@ -44,8 +44,9 @@ effects = {
 
 def swap_rgb_color(matrix):
     """Swap RGB to BGR or vice versa for the entire matrix."""
-    r, g, b = matrix.frame.split()
-    matrix.frame = Image.merge("RGB", (r, g, b))
+    # r, g, b = matrix.frame.split()
+    # matrix.frame = Image.merge("RGB", (r, g, b))
+    matrix.frame = matrix.frame[:, :, ::-1]
 
 def apply_effect(effect_name, matrix, config):
     """Apply an effect based on the effect name."""
