@@ -51,8 +51,8 @@ def swap_rgb_color(matrix):
 def apply_effect(effect_name, matrix, config):
     """Apply an effect based on the effect name."""
     if effect_name in effects:
-        swap_rgb_color(matrix)  # Assume you need to swap colors for all effects
         effects[effect_name](matrix, config)
+        # swap_rgb_color(matrix)  # Assume you need to swap colors for all effects
     else:
         print(f"Unknown effect: {effect_name}")
 
