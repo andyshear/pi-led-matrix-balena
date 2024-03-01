@@ -23,12 +23,12 @@ def get_current_effect():
 def effect_caution():
     """Red, yellow, repeat."""
     while not stop_event.is_set() and get_current_effect() == 'caution':
-        matrix.reset(matrix.color('red'))
+        matrix.reset()
         matrix.show()
-        matrix.delay(200)
+        matrix.delay(50)
         matrix.reset(matrix.color('yellow'))
         matrix.show()
-        matrix.delay(200)
+        matrix.delay(50)
     print("Exiting caution effect.")
 
 def effect_clear():
