@@ -7,8 +7,8 @@ import numpy as np
 from lib import colors
 from PIL import ImageEnhance, Image, ImageDraw, ImageFont
 
-CUSTOM_CONFIG = exists('config.json')
-CONFIG = 'default_config.json' if not CUSTOM_CONFIG else 'config.json'
+CUSTOM_CONFIG = exists('/pi-led-matrix-balena/config.json')
+CONFIG = '/pi-led-matrix-balena/default_config.json' if not CUSTOM_CONFIG else '/pi-led-matrix-balena/config.json'
 
 with open(CONFIG, mode='r',  encoding='utf8') as j_object:
     cfg = json.load(j_object)
