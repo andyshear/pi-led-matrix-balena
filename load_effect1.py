@@ -30,30 +30,30 @@ def get_current_effect():
 def effect_caution():
     """Red, yellow, repeat."""
     while not stop_event.is_set() and get_current_effect() == 'caution':
+        matrix.reset(matrix.color('yellow'))
+        
+        # Define the size of the matrix
+        width = 16
+        height = 16
+        
+        # Draw 'X' by connecting opposite corners
+        for i in range(min(width, height)):
+            # Draw from top-left to bottom-right
+            matrix.pixel((i, i), (0, 0, 255))
+            # Draw from top-right to bottom-left
+            matrix.pixel((width - 1 - i, i), (0, 0, 255))
+
+        matrix.show()
+        matrix.delay(50)
+        matrix.reset()
+        matrix.show()
+        matrix.delay(50)
         # matrix.reset()
         # matrix.show()
         # matrix.delay(50)
         # matrix.reset(matrix.color('yellow'))
-        
-        # # Define the size of the matrix
-        # width = 16
-        # height = 16
-        
-        # # Draw 'X' by connecting opposite corners
-        # for i in range(min(width, height)):
-        #     # Draw from top-left to bottom-right
-        #     matrix.pixel((i, i), (0, 0, 255))
-        #     # Draw from top-right to bottom-left
-        #     matrix.pixel((width - 1 - i, i), (0, 0, 255))
-
         # matrix.show()
         # matrix.delay(50)
-        matrix.reset()
-        matrix.show()
-        matrix.delay(50)
-        matrix.reset(matrix.color('yellow'))
-        matrix.show()
-        matrix.delay(50)
     print("Exiting caution effect.")
 
 def effect_clear():
