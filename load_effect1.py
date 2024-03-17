@@ -46,14 +46,20 @@ def effect_caution():
         matrix.show()
         matrix.delay(50)
         matrix.reset()
+        
+        # Define the size of the matrix
+        width = 16
+        height = 16
+        
+        # Draw 'X' by connecting opposite corners
+        for i in range(min(width, height)):
+            # Draw from top-left to bottom-right
+            matrix.pixel((i, i), (255, 0, 0))
+            # Draw from top-right to bottom-left
+            matrix.pixel((width - 1 - i, i), (255, 0, 0))
+
         matrix.show()
         matrix.delay(50)
-        # matrix.reset()
-        # matrix.show()
-        # matrix.delay(50)
-        # matrix.reset(matrix.color('yellow'))
-        # matrix.show()
-        # matrix.delay(50)
     print("Exiting caution effect.")
 
 def effect_clear():
@@ -87,7 +93,7 @@ def effect_clearAnimation():
     width, height = 16, 16
     scroll_speed = 100  # Milliseconds between updates
 
-    while not stop_event.is_set() and get_current_effect() == 'clear':
+    while not stop_event.is_set() and get_current_effect() == 'clearAnimation':
         for start_y in range(height, -arrow_height, -1):
             matrix.reset()  # Clear the matrix
 
@@ -104,11 +110,14 @@ def effect_clearAnimation():
                     for x_offset in range(width // 2 - 1, width // 2 + 2):  # Widen the shaft
                         matrix.pixel((x_offset, current_y), (0, 128, 0))
                 
-               # Arrowhead pointing upwards
-                if arrow_height - y_offset <= 3:
-                    arrowhead_width = arrow_height - y_offset - 1
+               # Arrowhead
+                arrowhead_depth = 3  # Depth of the arrowhead
+                if y_offset < arrowhead_depth:
+                    # Create a sharp point at the top
+                    arrowhead_width = arrowhead_depth - y_offset
                     for x_offset in range(width // 2 - arrowhead_width, width // 2 + arrowhead_width + 1):
                         matrix.pixel((x_offset, current_y), (0, 128, 0))
+
 
             matrix.show()
             matrix.delay(scroll_speed)
@@ -215,11 +224,11 @@ def effect_lastLapAnimation():
 
 effects = {
     'caution': effect_caution,
-    'clearAnimation': effect_clear,
-    'clear': effect_clearAnimation,
+    'clearAnimation': effect_clearAnimation,
+    'clear': effect_clear,
     'medical': effect_medical,
-    'lastLapAnimation': effect_lastLap,
-    'lastLap': effect_lastLapAnimation,
+    'lastLapAnimation': effect_lastLapAnimation,
+    'lastLap': effect_lastLap,
     'off': effect_off,
 }
 
