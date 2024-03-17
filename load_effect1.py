@@ -153,8 +153,8 @@ def effect_lastLap():
 
 effects = {
     'caution': effect_caution,
-    'clear': effect_clear,
-    'clearAnimation': effect_clearanimation,
+    'clearAnimation': effect_clear,
+    'clear': effect_clearanimation,
     'medical': effect_medical,
     'lastLap': effect_lastLap,
 }
