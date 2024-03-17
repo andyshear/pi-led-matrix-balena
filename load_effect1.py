@@ -104,7 +104,7 @@ def effect_clearAnimation():
                     continue  # Skip drawing outside the matrix bounds
                 
                 # Larger Arrow shaft
-                if y_offset > 2:  # Skip the top 3 rows for the arrowhead
+                if y_offset > 0:  # Skip the top 3 rows for the arrowhead
                     for x_offset in range(width // 2 - 1, width // 2 + 2):  # Widen the shaft
                         matrix.pixel((x_offset, current_y), (0, 128, 0))
                 
