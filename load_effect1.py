@@ -88,30 +88,33 @@ def effect_clearAnimation():
     scroll_speed = 100  # Milliseconds between updates
 
     while not stop_event.is_set() and get_current_effect() == 'clear':
-        for start_y in range(height, -arrow_height, -1):
+        for start_y in range(-arrow_height, height + arrow_height):
             matrix.reset()  # Clear the matrix
 
             # Draw the larger arrow pointing up
             for y_offset in range(arrow_height):
                 # Calculate the current y position of this part of the arrow
-                current_y = start_y - y_offset
+                current_y = start_y + y_offset
                 
                 if current_y < 0 or current_y >= height:
                     continue  # Skip drawing outside the matrix bounds
                 
                 # Larger Arrow shaft
-                for x_offset in range(width // 2 - 1, width // 2 + 2):  # Widen the shaft
-                    matrix.pixel((x_offset, current_y), (255, 255, 255))
+                if y_offset > 2:  # Skip the top 3 rows for the arrowhead
+                    for x_offset in range(width // 2 - 1, width // 2 + 2):  # Widen the shaft
+                        matrix.pixel((x_offset, current_y), (0, 128, 0))
                 
-                # Larger Arrowhead
+                # Arrowhead
                 arrowhead_depth = 3  # Depth of the arrowhead
                 if y_offset < arrowhead_depth:
-                    arrowhead_width = y_offset  # Make the arrowhead come to a sharp point
+                    # Create a sharp point at the top
+                    arrowhead_width = arrowhead_depth - y_offset
                     for x_offset in range(width // 2 - arrowhead_width, width // 2 + arrowhead_width + 1):
-                        matrix.pixel((x_offset, current_y), (255, 255, 255))
+                        matrix.pixel((x_offset, current_y), (0, 128, 0))
 
             matrix.show()
             matrix.delay(scroll_speed)
+
 
 
 def effect_medical():
