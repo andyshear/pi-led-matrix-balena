@@ -60,12 +60,40 @@ def effect_clear():
 def effect_medical():
     """Flash red and white for medical."""
     while not stop_event.is_set() and get_current_effect() == 'medical':
-        matrix.reset(matrix.color('red'))
+        # Define the size of the matrix and cross thickness
+        width = 16
+        height = 16
+        cross_thickness = max(1, min(width, height) // 8)  # Adjust the thickness as needed
+
+        # First, set the entire matrix to yellow for the background
+        for y in range(height):
+            for x in range(width):
+                matrix.pixel((x, y), matrix.color('white'))
+
+        # Calculate the starting and ending points for the vertical part of the cross
+        vertical_start = height // 2 - cross_thickness // 2
+        vertical_end = vertical_start + cross_thickness
+        # Draw the vertical part of the cross in red
+        for y in range(vertical_start, vertical_end):
+            for x in range(width):
+                matrix.pixel((x, y), matrix.color('red'))
+
+        # Calculate the starting and ending points for the horizontal part of the cross
+        horizontal_start = width // 2 - cross_thickness // 2
+        horizontal_end = horizontal_start + cross_thickness
+        # Draw the horizontal part of the cross in red
+        for x in range(horizontal_start, horizontal_end):
+            for y in range(height):
+                matrix.pixel((x, y), matrix.color('red'))
+
         matrix.show()
         matrix.delay(500)
-        matrix.reset(matrix.color('white'))
+
+        # Optional: Flash the cross by toggling between the cross and a blank state
+        matrix.reset()  # Clear the matrix
         matrix.show()
         matrix.delay(500)
+
     print("Exiting medical effect.")
 
 def effect_lastLap():

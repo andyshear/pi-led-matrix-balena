@@ -60,8 +60,8 @@ except ImportError:
 pixel_pin = board.D18 if not VIRTUAL_ENV else 0
 RGB = 'RGB'
 
-def delay(ms):
-    cv2.waitKey(ms)
+def delay(self, ms):
+    time.sleep(ms / 1000.0)  # Convert milliseconds to seconds
 
 def reset(rgb_color):
     r, g, b = rgb_color
