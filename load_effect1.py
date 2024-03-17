@@ -65,16 +65,17 @@ def effect_clear():
 
         # Coordinates for a simple thumbs-up
         # Adjust these based on your matrix size
-        thumb_pixels = [
-            # Thumb part
-            (6, 2), (6, 3), (7, 4), (7, 5),
-            (8, 6), (8, 7), (9, 8),
-            # Hand part
-            (10, 6), (10, 5), (10, 4), (10, 3), (9, 2), (9, 3), (9, 4),
-            (8, 4), (8, 3), (8, 2), (7, 3),
+        checkmark_pixels = [
+            (5, 10), (5, 11), (6, 10), (6, 11),  # Lower left part
+            (7, 9), (7, 8), (8, 9), (8, 8),      # Middle part, moving up and to the right
+            (9, 7), (9, 6), (10, 7), (10, 6),    # Continuation of middle part
+            (11, 5), (11, 4), (12, 5), (12, 4),  # Top of the middle part, before the diagonal
+            (9, 5), (9, 4), (10, 5), (10, 4),    # Starting the diagonal downwards
+            (7, 7), (7, 6), (8, 7), (8, 6),      # Middle of the diagonal downwards
+            (5, 9), (5, 8), (6, 9), (6, 8),      # End of the diagonal, close to the starting point
         ]
         # Loop through each coordinate and light it up
-        for x, y in thumb_pixels:
+        for x, y in checkmark_pixels:
             matrix.pixel((x, y), (0, 128, 0))  # White color for thumbs-up
 
         # Display the updated matrix
