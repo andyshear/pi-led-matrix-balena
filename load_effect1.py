@@ -108,13 +108,14 @@ def effect_clearAnimation():
                     for x_offset in range(width // 2 - 1, width // 2 + 2):  # Widen the shaft
                         matrix.pixel((x_offset, current_y), (0, 128, 0))
                 
-               # Arrowhead
+                # Arrowhead
                 arrowhead_depth = 3  # Depth of the arrowhead
                 if y_offset < arrowhead_depth:
-                    # Create a sharp point at the top
-                    arrowhead_width = arrowhead_depth - y_offset
-                    for x_offset in range(width // 2 - arrowhead_width, width // 2 + arrowhead_width + 1):
-                        matrix.pixel((x_offset, current_y - arrowhead_depth), (0, 128, 0))
+                    # Adjust the arrowhead drawing logic to start small and expand
+                    arrowhead_width = arrowhead_depth - y_offset  # This will now decrease, making the arrowhead start small
+                    # Flip the logic for x_offset to start with a small point
+                    for x_offset in range(width // 2 - y_offset, width // 2 + y_offset + 1):
+                        matrix.pixel((x_offset, current_y - arrowhead_depth + y_offset), (0, 128, 0))
 
 
             matrix.show()
@@ -197,13 +198,21 @@ def effect_off():
 def effect_lastLapAnimation():
     """Display white for the last lap."""
     while not stop_event.is_set() and get_current_effect() == 'lastLapAnimation':
-        matrix.reset(matrix.color('white'))
-        matrix.show()
-        matrix.delay(1000)
         # Define the checkerboard pattern size
         checker_size = 2  # Size of each checker square
         width, height = 16, 16
 
+        matrix.reset(matrix.color('white'))
+         # Loop through each cell in the matrix to create the checkerboard pattern
+        for y in range(height):
+            for x in range(width):
+                # Determine if the current cell should be black or remain white
+                if (x // checker_size % 2 == 0) ^ (y // checker_size % 2 == 0):
+                    matrix.pixel((x, y), (0, 0, 0))  # Set to black
+
+        # Display the checkerboard pattern
+        matrix.show()
+        matrix.delay(1000)
         # Clear the matrix first
         matrix.reset()
 
