@@ -33,8 +33,8 @@ def effect_caution():
         matrix.reset()
         
         # Define the size of the matrix
-        width = config['pixel_width']
-        height = config['pixel_height']
+        width = 16
+        height = 16
         
         # Draw 'X' by connecting opposite corners
         for i in range(min(width, height)):
