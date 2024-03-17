@@ -133,7 +133,7 @@ class VirtualMatrix():
         self.frame = reset(rgb_color)
 
     def delay(self, ms):
-        delay(ms)
+        time.sleep(ms / 1000.0)
 
     def line(self, start, end, rgb_color, width):
         cv2.line(self.frame, start, end, swap_rgb_to_bgr(rgb_color), width)
@@ -204,7 +204,7 @@ class LiveMatrix():
         cv2.circle(self.frame, center, radius, rgb_color, width)
 
     def delay(self, ms):
-        delay(ms)
+        time.sleep(ms / 1000.0)
 
     def sprite(self, sprite_map, start, color_map):
         sprite(self, sprite_map, start, color_map)
