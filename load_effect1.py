@@ -84,7 +84,7 @@ def effect_clear():
 def effect_clearAnimation():
     """Display an upward-scrolling arrow."""
     arrow_height = 5  # Adjust based on your matrix size
-    width, height = config['pixel_width'], config['pixel_height']
+    width, height =16, 16
     scroll_speed = 200  # Milliseconds between updates
 
     while not stop_event.is_set() and get_current_effect() == 'clear':
@@ -159,7 +159,7 @@ def effect_lastLapAnimation():
 
         # Define the checkerboard pattern size
         checker_size = 2  # Size of each checker square
-        width, height = config['pixel_width'], config['pixel_height']
+        width, height = 16, 16
 
         # Clear the matrix first
         matrix.reset(matrix.color('black'))
