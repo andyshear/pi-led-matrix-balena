@@ -82,35 +82,37 @@ def effect_clear():
         matrix.show()
 
 def effect_clearAnimation():
-    """Display a downward-scrolling, larger arrow."""
+    """Display an upward-scrolling, larger arrow with a sharp point."""
     arrow_height = 10  # Adjusted for a larger arrow
     width, height = 16, 16
-    scroll_speed = 200  # Milliseconds between updates
+    scroll_speed = 100  # Milliseconds between updates
 
     while not stop_event.is_set() and get_current_effect() == 'clear':
-        for start_y in range(-arrow_height, height + arrow_height):
-            matrix.reset()  # Clear the matrix
+        for start_y in range(height, -arrow_height, -1):
+            matrix.reset(matrix.color('green'))  # Clear the matrix
 
-            # Draw the larger arrow
+            # Draw the larger arrow pointing up
             for y_offset in range(arrow_height):
                 # Calculate the current y position of this part of the arrow
-                current_y = start_y + y_offset
+                current_y = start_y - y_offset
                 
                 if current_y < 0 or current_y >= height:
                     continue  # Skip drawing outside the matrix bounds
                 
                 # Larger Arrow shaft
                 for x_offset in range(width // 2 - 1, width // 2 + 2):  # Widen the shaft
-                    matrix.pixel((x_offset, current_y), (0, 128, 0))
+                    matrix.pixel((x_offset, current_y), (255, 255, 255))
                 
                 # Larger Arrowhead
-                if y_offset >= arrow_height - 3:  # Adjust the size of the arrowhead
-                    arrowhead_width = arrow_height - y_offset
+                arrowhead_depth = 3  # Depth of the arrowhead
+                if y_offset < arrowhead_depth:
+                    arrowhead_width = y_offset  # Make the arrowhead come to a sharp point
                     for x_offset in range(width // 2 - arrowhead_width, width // 2 + arrowhead_width + 1):
-                        matrix.pixel((x_offset, current_y), (0, 128, 0))
+                        matrix.pixel((x_offset, current_y), (255, 255, 255))
 
             matrix.show()
             matrix.delay(scroll_speed)
+
 
 def effect_medical():
     """Flash red and white for medical."""
