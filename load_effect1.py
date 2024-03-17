@@ -110,12 +110,17 @@ def effect_clearAnimation():
                 
                 # Arrowhead
                 arrowhead_depth = 3  # Depth of the arrowhead
-                if y_offset < arrowhead_depth:
-                    # Adjust the arrowhead drawing logic to start small and expand
-                    arrowhead_width = arrowhead_depth - y_offset  # This will now decrease, making the arrowhead start small
-                    # Flip the logic for x_offset to start with a small point
-                    for x_offset in range(width // 2 - y_offset, width // 2 + y_offset + 1):
-                        matrix.pixel((x_offset, current_y - arrowhead_depth + y_offset), (0, 128, 0))
+                for y_offset in range(arrowhead_depth):
+                    current_y = start_y - arrowhead_depth + y_offset
+                    
+                    if current_y < 0 or current_y >= height:
+                        continue  # Skip drawing outside the matrix bounds
+                    
+                    # Adjust the logic for drawing the arrowhead to cover every y_offset
+                    arrowhead_width = arrowhead_depth - y_offset
+                    for x_offset in range(width // 2 - arrowhead_width, width // 2 + arrowhead_width + 1):
+                        matrix.pixel((x_offset, current_y), (0, 128, 0))
+
 
 
             matrix.show()
