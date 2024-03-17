@@ -196,16 +196,16 @@ def effect_off():
 
 def effect_lastLapAnimation():
     """Display white for the last lap."""
-    while not stop_event.is_set() and get_current_effect() == 'lastLap':
+    while not stop_event.is_set() and get_current_effect() == 'lastLapAnimation':
         matrix.reset(matrix.color('white'))
         matrix.show()
-
+        matrix.delay(1000)
         # Define the checkerboard pattern size
         checker_size = 2  # Size of each checker square
         width, height = 16, 16
 
         # Clear the matrix first
-        matrix.reset(matrix.color('black'))
+        matrix.reset()
 
         # Loop through each cell in the matrix to create the checkerboard pattern
         for y in range(height):
@@ -218,7 +218,7 @@ def effect_lastLapAnimation():
         matrix.show()
 
         # Keep the pattern displayed for a while before checking if the effect should stop
-        matrix.delay(2000)  # Delay for 2000 milliseconds (2 seconds)
+        matrix.delay(1000)
 
 effects = {
     'caution': effect_caution,
