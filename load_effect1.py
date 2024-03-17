@@ -60,7 +60,21 @@ def effect_clear():
     """Clear the matrix."""
     global stop_event
     if get_current_effect() == 'clear':
+         # Clear the matrix first
         matrix.reset(matrix.color('green'))
+
+        # Coordinates for a simple thumbs-up
+        # Adjust these based on your matrix size
+        thumb_pixels = [
+            (4, 1), (4, 2), (3, 2),
+            (2, 3), (2, 4), (3, 4),
+            (4, 4), (5, 4), (6, 3), (6, 2)
+        ]
+        # Loop through each coordinate and light it up
+        for x, y in thumb_pixels:
+            matrix.pixel((x, y), (255, 255, 255))  # White color for thumbs-up
+
+        # Display the updated matrix
         matrix.show()
 
 def effect_medical():
