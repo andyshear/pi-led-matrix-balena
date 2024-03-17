@@ -72,13 +72,15 @@ def effect_clear():
         # Coordinates for a simple thumbs-up
         # Adjust these based on your matrix size
         checkmark_pixels = [
-            (5, 10), (5, 11), (6, 10), (6, 11),  # Lower left part
-            (7, 9), (7, 8), (8, 9), (8, 8),      # Middle part, moving up and to the right
-            (9, 7), (9, 6), (10, 7), (10, 6),    # Continuation of middle part
-            (11, 5), (11, 4), (12, 5), (12, 4),  # Top of the middle part, before the diagonal
-            (9, 5), (9, 4), (10, 5), (10, 4),    # Starting the diagonal downwards
-            (7, 7), (7, 6), (8, 7), (8, 6),      # Middle of the diagonal downwards
-            (5, 9), (5, 8), (6, 9), (6, 8),      # End of the diagonal, close to the starting point
+            # Tail of the checkmark
+            (10, 9), (10, 10), (11, 9), (11, 10),
+            # Bottom part of the check
+            (8, 11), (8, 12), (9, 11), (9, 12), (10, 11), (10, 12),
+            # Middle part of the check, diagonal upwards to the right
+            (6, 9), (6, 10), (7, 9), (7, 10), (8, 7), (8, 8), (9, 7), (9, 8),
+            # Top part of the check, continuing diagonal, then straight
+            (10, 5), (10, 6), (11, 5), (11, 6), (12, 5), (12, 6),
+            (13, 3), (13, 4), (14, 3), (14, 4),
         ]
         # Loop through each coordinate and light it up
         for x, y in checkmark_pixels:
@@ -114,7 +116,7 @@ def effect_clearAnimation():
                 arrowhead_depth = 3  # Depth of the arrowhead
                 if y_offset < arrowhead_depth:
                     # Create a sharp point at the top
-                    arrowhead_width = arrowhead_depth - y_offset - 1
+                    arrowhead_width = arrowhead_depth - y_offset - 2
                     for x_offset in range(width // 2 - arrowhead_width, width // 2 + arrowhead_width + 1):
                         matrix.pixel((x_offset, current_y), (0, 128, 0))
 
