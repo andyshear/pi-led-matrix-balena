@@ -2,7 +2,7 @@ import sys
 import json
 import threading
 from src.led_matrix import Matrix, pixel_height, pixel_width
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 # Initialize global variables for effect control
 current_effect = None
@@ -10,6 +10,13 @@ effect_change_lock = threading.Lock()
 matrix = Matrix()  # Initialize your matrix here
 stop_event = threading.Event()  # Define the stop event here
 current_effect_thread = None  # Keep a reference to the current effect thread
+
+# Define the delay for flashing and scrolling
+FLASH_DELAY = 200  # milliseconds for color change
+SCROLL_DELAY = 20  # milliseconds for scroll speed
+MESSAGE = "CAUTION"
+FONT_SIZE = 16  # Adjust as needed
+FONT_PATH = "path/to/font.ttf"  # Adjust the font path as necessary
 
 def set_current_effect(effect):
     global current_effect
@@ -21,14 +28,38 @@ def get_current_effect():
         return current_effect
 
 def effect_caution():
-    """Red, yellow, repeat."""
+    """Red, yellow, repeat with scrolling 'CAUTION' text."""
+    # Load font
+    font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
+
+    # Initial position for the scrolling text
+    x_position = pixel_width
+
+    # Calculate text width for scrolling reset
+    text_width, _ = font.getsize(MESSAGE)
+
     while not stop_event.is_set() and get_current_effect() == 'caution':
-        matrix.reset()
+        # Reset the display for each iteration
+        matrix.reset((0, 0, 0))  # Clear the matrix
+
+        # Create an image for the text
+        text_image = Image.new('RGB', (text_width, pixel_height), (0, 0, 0))
+        draw = ImageDraw.Draw(text_image)
+        draw.text((0, 0), MESSAGE, font=font, fill=(255, 255, 0))  # Yellow text
+
+        # Convert PIL image to numpy array
+        text_array = np.array(text_image)
+
+        # Scroll the message
+        if x_position + text_width > 0:
+            matrix.image(text_array, position=(x_position, 0))
+        x_position -= 1
+        if x_position + text_width < 0:
+            x_position = pixel_width
+
         matrix.show()
-        matrix.delay(50)
-        matrix.reset(matrix.color('yellow'))
-        matrix.show()
-        matrix.delay(50)
+        matrix.delay(SCROLL_DELAY)
+
     print("Exiting caution effect.")
 
 def effect_clear():
