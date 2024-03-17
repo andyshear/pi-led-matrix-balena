@@ -89,7 +89,7 @@ def effect_clearAnimation():
 
     while not stop_event.is_set() and get_current_effect() == 'clear':
         for start_y in range(height, -arrow_height, -1):
-            matrix.reset(matrix.color('green'))  # Clear the matrix
+            matrix.reset()  # Clear the matrix
 
             # Draw the larger arrow pointing up
             for y_offset in range(arrow_height):
