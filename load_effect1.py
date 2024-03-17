@@ -81,13 +81,13 @@ def effect_clear():
         # Display the updated matrix
         matrix.show()
 
-def effect_clearanimation():
+def effect_clearAnimation():
     """Display an upward-scrolling arrow."""
     arrow_height = 5  # Adjust based on your matrix size
     width, height = config['pixel_width'], config['pixel_height']
     scroll_speed = 200  # Milliseconds between updates
 
-    while not stop_event.is_set() and get_current_effect() == 'clearanimation':
+    while not stop_event.is_set() and get_current_effect() == 'clear':
         for start_y in range(height + arrow_height, -arrow_height, -1):
             matrix.reset(matrix.color('green'))  # Clear the matrix
 
@@ -151,12 +151,39 @@ def effect_lastLap():
         matrix.reset(matrix.color('white'))
         matrix.show()
 
+def effect_lastLapAnimation():
+    """Display white for the last lap."""
+    while not stop_event.is_set() and get_current_effect() == 'lastLap':
+        matrix.reset(matrix.color('white'))
+        matrix.show()
+
+        # Define the checkerboard pattern size
+        checker_size = 2  # Size of each checker square
+        width, height = config['pixel_width'], config['pixel_height']
+
+        # Clear the matrix first
+        matrix.reset(matrix.color('black'))
+
+        # Loop through each cell in the matrix to create the checkerboard pattern
+        for y in range(height):
+            for x in range(width):
+                # Determine if the current cell should be white or remain black
+                if (x // checker_size % 2 == 0) ^ (y // checker_size % 2 == 0):
+                    matrix.pixel((x, y), (255, 255, 255))  # Set to white
+
+        # Display the checkerboard pattern
+        matrix.show()
+
+        # Keep the pattern displayed for a while before checking if the effect should stop
+        matrix.delay(2000)  # Delay for 2000 milliseconds (2 seconds)
+
 effects = {
     'caution': effect_caution,
     'clearAnimation': effect_clear,
-    'clear': effect_clearanimation,
+    'clear': effect_clearAnimation,
     'medical': effect_medical,
-    'lastLap': effect_lastLap,
+    'lastLapAnimation': effect_lastLap,
+    'lastLap': effect_lastLapAnimation,
 }
 
 def apply_effect(effect_name):
