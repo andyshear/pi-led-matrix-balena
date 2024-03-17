@@ -39,9 +39,9 @@ def effect_caution():
         # Draw 'X' by connecting opposite corners
         for i in range(min(width, height)):
             # Draw from top-left to bottom-right
-            matrix.pixel((i, i), (0, 0, 255))
+            matrix.pixel((i, i), (255, 0, 0))
             # Draw from top-right to bottom-left
-            matrix.pixel((width - 1 - i, i), (0, 0, 255))
+            matrix.pixel((width - 1 - i, i), (255, 0, 0))
 
         matrix.show()
         matrix.delay(50)
@@ -71,10 +71,8 @@ def effect_medical():
         height = 16
         cross_thickness = max(1, min(width, height) // 8)  # Adjust the thickness as needed
 
-        # First, set the entire matrix to yellow for the background
-        for y in range(height):
-            for x in range(width):
-                matrix.pixel((x, y), matrix.color('white'))
+        # First, set the entire matrix to white for the background
+        matrix.reset(matrix.color('white'))
 
         # Calculate the starting and ending points for the vertical part of the cross
         vertical_start = height // 2 - cross_thickness // 2
@@ -82,7 +80,7 @@ def effect_medical():
         # Draw the vertical part of the cross in red
         for y in range(vertical_start, vertical_end):
             for x in range(width):
-                matrix.pixel((x, y), matrix.color('red'))
+                matrix.pixel((x, y), (255, 0, 0))
 
         # Calculate the starting and ending points for the horizontal part of the cross
         horizontal_start = width // 2 - cross_thickness // 2
@@ -90,7 +88,7 @@ def effect_medical():
         # Draw the horizontal part of the cross in red
         for x in range(horizontal_start, horizontal_end):
             for y in range(height):
-                matrix.pixel((x, y), matrix.color('red'))
+                matrix.pixel((x, y), (255, 0, 0))
 
         matrix.show()
         matrix.delay(500)
