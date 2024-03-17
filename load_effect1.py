@@ -116,9 +116,9 @@ def effect_clearAnimation():
                 arrowhead_depth = 3  # Depth of the arrowhead
                 if y_offset < arrowhead_depth:
                     # Create a sharp point at the top
-                    arrowhead_width = arrowhead_depth - y_offset - 2
+                    arrowhead_width = arrowhead_depth - y_offset
                     for x_offset in range(width // 2 - arrowhead_width, width // 2 + arrowhead_width + 1):
-                        matrix.pixel((x_offset, current_y), (0, 128, 0))
+                        matrix.pixel((x_offset, current_y + 3), (0, 128, 0))
 
 
             matrix.show()
