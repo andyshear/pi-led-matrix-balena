@@ -72,8 +72,12 @@ def effect_clear():
         # Coordinates for a simple thumbs-up
         # Adjust these based on your matrix size
         checkmark_pixels = [
-            (2,10),(4,14),(15,2)
+            # Line from (1, 9) to (6, 14)
+            (1, 9), (2, 10), (3, 11), (4, 12), (5, 13), (6, 14),
+            # Line from (6, 14) to (14, 2)
+            (6, 14), (7, 13), (8, 12), (9, 11), (10, 10), (11, 9), (12, 8), (13, 5), (14, 2),
         ]
+
         # Loop through each coordinate and light it up
         for x, y in checkmark_pixels:
             matrix.pixel((x, y), (0, 128, 0))  # White color for thumbs-up
