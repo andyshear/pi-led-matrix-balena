@@ -82,29 +82,33 @@ def effect_clear():
         matrix.show()
 
 def effect_clearAnimation():
-    """Display an upward-scrolling arrow."""
-    arrow_height = 5  # Adjust based on your matrix size
-    width, height =16, 16
+    """Display a downward-scrolling, larger arrow."""
+    arrow_height = 10  # Adjusted for a larger arrow
+    width, height = 16, 16
     scroll_speed = 200  # Milliseconds between updates
 
     while not stop_event.is_set() and get_current_effect() == 'clear':
-        for start_y in range(height + arrow_height, -arrow_height, -1):
-            matrix.reset(matrix.color('green'))  # Clear the matrix
+        for start_y in range(-arrow_height, height + arrow_height):
+            matrix.reset()  # Clear the matrix
 
-            # Draw the arrow
+            # Draw the larger arrow
             for y_offset in range(arrow_height):
-                if start_y - y_offset < 0 or start_y - y_offset >= height:
+                # Calculate the current y position of this part of the arrow
+                current_y = start_y + y_offset
+                
+                if current_y < 0 or current_y >= height:
                     continue  # Skip drawing outside the matrix bounds
                 
-                # Arrow shaft
-                matrix.pixel((width // 2, start_y - y_offset), (255, 255, 255))
+                # Larger Arrow shaft
+                for x_offset in range(width // 2 - 1, width // 2 + 2):  # Widen the shaft
+                    matrix.pixel((x_offset, current_y), (0, 128, 0))
                 
-                # Arrowhead
-                if y_offset == 0:
-                    matrix.pixel((width // 2 - 1, start_y), (255, 255, 255))
-                    matrix.pixel((width // 2 + 1, start_y), (255, 255, 255))
-                    matrix.pixel((width // 2, start_y + 1), (255, 255, 255))
-            
+                # Larger Arrowhead
+                if y_offset >= arrow_height - 3:  # Adjust the size of the arrowhead
+                    arrowhead_width = arrow_height - y_offset
+                    for x_offset in range(width // 2 - arrowhead_width, width // 2 + arrowhead_width + 1):
+                        matrix.pixel((x_offset, current_y), (0, 128, 0))
+
             matrix.show()
             matrix.delay(scroll_speed)
 
