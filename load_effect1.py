@@ -109,7 +109,7 @@ def effect_clearAnimation():
                         matrix.pixel((x_offset, current_y), (0, 128, 0))
                 
                 # Arrowhead
-                arrowhead_depth = 3  # Depth of the arrowhead
+                arrowhead_depth = 5  # Depth of the arrowhead
                 for y_offset in range(arrowhead_depth):
                     # Draw the arrowhead for every y_offset without skipping
                     # Calculate the width of the arrowhead at this level
