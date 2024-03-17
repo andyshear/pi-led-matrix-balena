@@ -28,38 +28,23 @@ def get_current_effect():
         return current_effect
 
 def effect_caution():
-    """Red, yellow, repeat with scrolling 'CAUTION' text."""
-    # Load font
-    font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
-
-    # Initial position for the scrolling text
-    x_position = pixel_width
-
-    # Calculate text width for scrolling reset
-    text_width, _ = font.getsize(MESSAGE)
-
+    """Red, yellow, repeat."""
     while not stop_event.is_set() and get_current_effect() == 'caution':
-        # Reset the display for each iteration
-        matrix.reset((0, 0, 0))  # Clear the matrix
-
-        # Create an image for the text
-        text_image = Image.new('RGB', (text_width, pixel_height), (0, 0, 0))
-        draw = ImageDraw.Draw(text_image)
-        draw.text((0, 0), MESSAGE, font=font, fill=(255, 255, 0))  # Yellow text
-
-        # Convert PIL image to numpy array
-        text_array = np.array(text_image)
-
-        # Scroll the message
-        if x_position + text_width > 0:
-            matrix.image(text_array, position=(x_position, 0))
-        x_position -= 1
-        if x_position + text_width < 0:
-            x_position = pixel_width
+       matrix.reset()
+        
+        # Define the size of the matrix
+        width = config['pixel_width']
+        height = config['pixel_height']
+        
+        # Draw 'X' by connecting opposite corners
+        for i in range(min(width, height)):
+            # Draw from top-left to bottom-right
+            matrix.pixel((i, i), (255, 255, 255))
+            # Draw from top-right to bottom-left
+            matrix.pixel((width - 1 - i, i), (255, 255, 255))
 
         matrix.show()
-        matrix.delay(SCROLL_DELAY)
-
+        matrix.delay(1000)
     print("Exiting caution effect.")
 
 def effect_clear():
