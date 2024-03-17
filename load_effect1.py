@@ -61,21 +61,51 @@ def effect_clear():
     global stop_event
     if get_current_effect() == 'clear':
          # Clear the matrix first
-        matrix.reset(matrix.color('green'))
+        matrix.reset()
 
         # Coordinates for a simple thumbs-up
         # Adjust these based on your matrix size
         thumb_pixels = [
-            (4, 1), (4, 2), (3, 2),
-            (2, 3), (2, 4), (3, 4),
-            (4, 4), (5, 4), (6, 3), (6, 2)
+            # Thumb part
+            (6, 2), (6, 3), (7, 4), (7, 5),
+            (8, 6), (8, 7), (9, 8),
+            # Hand part
+            (10, 6), (10, 5), (10, 4), (10, 3), (9, 2), (9, 3), (9, 4),
+            (8, 4), (8, 3), (8, 2), (7, 3),
         ]
         # Loop through each coordinate and light it up
         for x, y in thumb_pixels:
-            matrix.pixel((x, y), (255, 255, 255))  # White color for thumbs-up
+            matrix.pixel((x, y), (0, 128, 0))  # White color for thumbs-up
 
         # Display the updated matrix
         matrix.show()
+
+def effect_clearanimation():
+    """Display an upward-scrolling arrow."""
+    arrow_height = 5  # Adjust based on your matrix size
+    width, height = config['pixel_width'], config['pixel_height']
+    scroll_speed = 200  # Milliseconds between updates
+
+    while not stop_event.is_set() and get_current_effect() == 'clearanimation':
+        for start_y in range(height + arrow_height, -arrow_height, -1):
+            matrix.reset(matrix.color('green'))  # Clear the matrix
+
+            # Draw the arrow
+            for y_offset in range(arrow_height):
+                if start_y - y_offset < 0 or start_y - y_offset >= height:
+                    continue  # Skip drawing outside the matrix bounds
+                
+                # Arrow shaft
+                matrix.pixel((width // 2, start_y - y_offset), (255, 255, 255))
+                
+                # Arrowhead
+                if y_offset == 0:
+                    matrix.pixel((width // 2 - 1, start_y), (255, 255, 255))
+                    matrix.pixel((width // 2 + 1, start_y), (255, 255, 255))
+                    matrix.pixel((width // 2, start_y + 1), (255, 255, 255))
+            
+            matrix.show()
+            matrix.delay(scroll_speed)
 
 def effect_medical():
     """Flash red and white for medical."""
@@ -123,6 +153,7 @@ def effect_lastLap():
 effects = {
     'caution': effect_caution,
     'clear': effect_clear,
+    'clearAnimation': effect_clearanimation,
     'medical': effect_medical,
     'lastLap': effect_lastLap,
 }
@@ -141,7 +172,7 @@ def apply_effect(effect_name):
 def listen_for_commands():
     """Continuously listen for new commands and apply effects accordingly."""
     while True:
-        new_effect = input("Enter new effect (caution, clear, medical, lastLap) or 'exit' to quit: ")
+        new_effect = input("Enter new effect (caution, clear, clearAnimation, medical, lastLap) or 'exit' to quit: ")
         if new_effect == 'exit':
             if current_effect_thread is not None:
                 stop_event.set()
