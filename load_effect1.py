@@ -72,7 +72,7 @@ def effect_clear():
         # Coordinates for a simple thumbs-up
         # Adjust these based on your matrix size
         checkmark_pixels = [
-            (3,6),(9,9),(15,2)
+            (2,10),(4,14),(15,2)
         ]
         # Loop through each coordinate and light it up
         for x, y in checkmark_pixels:
