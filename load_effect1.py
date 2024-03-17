@@ -88,7 +88,7 @@ def effect_clearAnimation():
     scroll_speed = 100  # Milliseconds between updates
 
     while not stop_event.is_set() and get_current_effect() == 'clear':
-        for start_y in range(-arrow_height, height + arrow_height):
+        for start_y in range(height, -arrow_height, -1):
             matrix.reset()  # Clear the matrix
 
             # Draw the larger arrow pointing up
@@ -104,11 +104,9 @@ def effect_clearAnimation():
                     for x_offset in range(width // 2 - 1, width // 2 + 2):  # Widen the shaft
                         matrix.pixel((x_offset, current_y), (0, 128, 0))
                 
-                # Arrowhead
-                arrowhead_depth = 3  # Depth of the arrowhead
-                if y_offset < arrowhead_depth:
-                    # Create a sharp point at the top
-                    arrowhead_width = arrowhead_depth - y_offset
+               # Arrowhead pointing upwards
+                if arrow_height - y_offset <= 3:
+                    arrowhead_width = arrow_height - y_offset - 1
                     for x_offset in range(width // 2 - arrowhead_width, width // 2 + arrowhead_width + 1):
                         matrix.pixel((x_offset, current_y), (0, 128, 0))
 
@@ -148,7 +146,30 @@ def effect_medical():
         matrix.delay(500)
 
         # Optional: Flash the cross by toggling between the cross and a blank state
-        matrix.reset()  # Clear the matrix
+        # Define the size of the matrix and cross thickness
+        width = 16
+        height = 16
+        cross_thickness = max(1, min(width, height) // 8)  # Adjust the thickness as needed
+
+        # First, set the entire matrix to white for the background
+        matrix.reset()
+
+        # Calculate the starting and ending points for the vertical part of the cross
+        vertical_start = height // 2 - cross_thickness // 2
+        vertical_end = vertical_start + cross_thickness
+        # Draw the vertical part of the cross in red
+        for y in range(vertical_start, vertical_end):
+            for x in range(width):
+                matrix.pixel((x, y), (255, 0, 0))
+
+        # Calculate the starting and ending points for the horizontal part of the cross
+        horizontal_start = width // 2 - cross_thickness // 2
+        horizontal_end = horizontal_start + cross_thickness
+        # Draw the horizontal part of the cross in red
+        for x in range(horizontal_start, horizontal_end):
+            for y in range(height):
+                matrix.pixel((x, y), (255, 0, 0))
+
         matrix.show()
         matrix.delay(500)
 
@@ -158,6 +179,12 @@ def effect_lastLap():
     """Display white for the last lap."""
     if get_current_effect() == 'lastLap':
         matrix.reset(matrix.color('white'))
+        matrix.show()
+
+def effect_off():
+    """Display off."""
+    if get_current_effect() == 'off':
+        matrix.reset()
         matrix.show()
 
 def effect_lastLapAnimation():
@@ -193,6 +220,7 @@ effects = {
     'medical': effect_medical,
     'lastLapAnimation': effect_lastLap,
     'lastLap': effect_lastLapAnimation,
+    'off': effect_off,
 }
 
 def apply_effect(effect_name):
