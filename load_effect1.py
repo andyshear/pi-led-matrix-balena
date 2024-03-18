@@ -83,7 +83,7 @@ def effect_clear():
         #     matrix.pixel((x, y), (0, 128, 0))  # White color for thumbs-up
         arrow_height = 10  # Adjusted for a larger arrow
         width, height = 16, 16
-        start_y = -5
+        start_y = 10
         for y_offset in range(arrow_height):
             # Calculate the current y position of this part of the arrow
             current_y = start_y + y_offset
