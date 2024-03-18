@@ -89,7 +89,7 @@ def effect_clearAnimation():
     """Display an upward-scrolling, larger arrow with a sharp point."""
     arrow_height = 10  # Adjusted for a larger arrow
     width, height = 16, 16
-    scroll_speed = 100  # Milliseconds between updates
+    scroll_speed = 50  # Milliseconds between updates
 
     while not stop_event.is_set() and get_current_effect() == 'clearAnimation':
         for start_y in range(height, -arrow_height, -1):
