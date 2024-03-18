@@ -69,18 +69,41 @@ def effect_clear():
          # Clear the matrix first
         matrix.reset()
 
-        # Coordinates for a simple thumbs-up
-        # Adjust these based on your matrix size
-        checkmark_pixels = [
-            (2, 9), (3, 10), (4, 11), (5, 12), (6, 13),
-            (1, 9), (2, 10), (3, 11), (4, 12), (5, 13),
-            (5, 14), (6, 13), (7, 12), (8, 11), (9, 10), (10, 9), (11, 8), (12, 7), (13, 6), (14, 5),
-            (5, 13), (6, 12), (7, 11), (8, 10), (9, 11), (10, 10), (11, 9), (12, 8), (13, 7), (14, 6),
-        ]
+        # # Coordinates for a simple thumbs-up
+        # # Adjust these based on your matrix size
+        # checkmark_pixels = [
+        #     (2, 9), (3, 10), (4, 11), (5, 12), (6, 13),
+        #     (1, 9), (2, 10), (3, 11), (4, 12), (5, 13),
+        #     (5, 14), (6, 13), (7, 12), (8, 11), (9, 10), (10, 9), (11, 8), (12, 7), (13, 6), (14, 5),
+        #     (5, 13), (6, 12), (7, 11), (8, 10), (9, 11), (10, 10), (11, 9), (12, 8), (13, 7), (14, 6),
+        # ]
 
-        # Loop through each coordinate and light it up
-        for x, y in checkmark_pixels:
-            matrix.pixel((x, y), (0, 128, 0))  # White color for thumbs-up
+        # # Loop through each coordinate and light it up
+        # for x, y in checkmark_pixels:
+        #     matrix.pixel((x, y), (0, 128, 0))  # White color for thumbs-up
+        # Draw the larger arrow pointing up
+        for y_offset in range(arrow_height):
+            # Calculate the current y position of this part of the arrow
+            current_y = start_y + y_offset
+            
+            if current_y < 0 or current_y >= height:
+                continue  # Skip drawing outside the matrix bounds
+            
+            # Larger Arrow shaft
+            if y_offset > 0:  # Skip the top 3 rows for the arrowhead
+                for x_offset in range(width // 2 - 1, width // 2 + 2):  # Widen the shaft
+                    matrix.pixel((x_offset, current_y), (0, 128, 0))
+            
+            # Arrowhead
+            arrowhead_depth = 5  # Depth of the arrowhead
+            for y_offset in range(arrowhead_depth):
+                # Draw the arrowhead for every y_offset without skipping
+                # Calculate the width of the arrowhead at this level
+                arrowhead_width = arrowhead_depth - y_offset
+                for x_offset in range(width // 2 - y_offset, width // 2 + y_offset + 1):
+                    # Adjust y position to start drawing from the top of the arrowhead
+                    current_y_position = start_y - arrowhead_depth + y_offset + 1
+                    matrix.pixel((x_offset, current_y_position), (0, 128, 0))
 
         # Display the updated matrix
         matrix.show()
@@ -162,7 +185,7 @@ def effect_medical():
         cross_thickness = max(1, min(width, height) // 8)  # Adjust the thickness as needed
 
         # First, set the entire matrix to white for the background
-        matrix.reset()
+        matrix.reset(matrix.color('red'))
 
         # Calculate the starting and ending points for the vertical part of the cross
         vertical_start = height // 2 - cross_thickness // 2
@@ -170,7 +193,7 @@ def effect_medical():
         # Draw the vertical part of the cross in red
         for y in range(vertical_start, vertical_end):
             for x in range(width):
-                matrix.pixel((x, y), (255, 0, 0))
+                matrix.pixel((x, y), (255, 255, 255))
 
         # Calculate the starting and ending points for the horizontal part of the cross
         horizontal_start = width // 2 - cross_thickness // 2
@@ -178,7 +201,7 @@ def effect_medical():
         # Draw the horizontal part of the cross in red
         for x in range(horizontal_start, horizontal_end):
             for y in range(height):
-                matrix.pixel((x, y), (255, 0, 0))
+                matrix.pixel((x, y), (255, 255, 255))
 
         matrix.show()
         matrix.delay(500)
