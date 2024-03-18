@@ -81,7 +81,9 @@ def effect_clear():
         # # Loop through each coordinate and light it up
         # for x, y in checkmark_pixels:
         #     matrix.pixel((x, y), (0, 128, 0))  # White color for thumbs-up
-        # Draw the larger arrow pointing up
+        arrow_height = 10  # Adjusted for a larger arrow
+        width, height = 16, 16
+        start_y = 0
         for y_offset in range(arrow_height):
             # Calculate the current y position of this part of the arrow
             current_y = start_y + y_offset
