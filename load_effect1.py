@@ -62,25 +62,98 @@ def effect_caution():
         matrix.delay(50)
     print("Exiting caution effect.")
 
+def effect_caution_right():
+    """Red, yellow, repeat."""
+    while not stop_event.is_set() and get_current_effect() == 'cautionRight':
+        matrix.reset(matrix.color('yellow'))
+        
+        # Define the size of the matrix
+        width = 16
+        height = 16
+        
+        # Draw 'X' by connecting opposite corners
+        for i in range(min(width, height)):
+            # Draw from top-left to bottom-right
+            matrix.pixel((i, i), (255, 0, 0))
+            # Draw from top-right to bottom-left
+            matrix.pixel((width - 1 - i, i), (255, 0, 0))
+
+        matrix.show()
+        matrix.delay(50)
+        matrix.reset()
+        
+        # Define the size of the matrix
+        width = 16
+        height = 16
+        
+        # Draw 'X' by connecting opposite corners
+        for i in range(min(width, height)):
+            # Draw from top-left to bottom-right
+            matrix.pixel((i, i), (255, 0, 0))
+            # Draw from top-right to bottom-left
+            matrix.pixel((width - 1 - i, i), (255, 0, 0))
+
+        matrix.show()
+        matrix.delay(50)
+    print("Exiting caution effect.")
+
+def effect_caution_left():
+    """Red, yellow, repeat."""
+    while not stop_event.is_set() and get_current_effect() == 'cautionLeft':
+        matrix.reset(matrix.color('yellow'))
+        
+        # Define the size of the matrix
+        width = 16
+        height = 16
+        
+        # # Draw 'X' by connecting opposite corners
+        # for i in range(min(width, height)):
+        #     # Draw from top-left to bottom-right
+        #     matrix.pixel((i, i), (255, 0, 0))
+        #     # Draw from top-right to bottom-left
+        #     matrix.pixel((width - 1 - i, i), (255, 0, 0))
+        # Draw the shaft of the arrow (diagonal from bottom-right to top-left)
+        for i in range(arrow_length):
+            matrix.pixel((width - 1 - i, i), (255, 0, 0))  # Red color for the arrow shaft
+
+        # Draw the arrowhead (extending at 45 degrees from the shaft)
+        for i in range(3):  # Adjust this range for arrowhead size
+            matrix.pixel((width - arrow_length + i, arrow_length - 1 - i), (255, 0, 0))
+            matrix.pixel((width - arrow_length - i, arrow_length - 1 - i), (255, 0, 0))
+
+        matrix.show()
+        matrix.delay(50)
+        matrix.reset()
+        
+        # Define the size of the matrix
+        width = 16
+        height = 16
+        
+        # # Draw 'X' by connecting opposite corners
+        # for i in range(min(width, height)):
+        #     # Draw from top-left to bottom-right
+        #     matrix.pixel((i, i), (255, 0, 0))
+        #     # Draw from top-right to bottom-left
+        #     matrix.pixel((width - 1 - i, i), (255, 0, 0))
+        # Draw the shaft of the arrow (diagonal from bottom-right to top-left)
+        for i in range(arrow_length):
+            matrix.pixel((width - 1 - i, i), (255, 0, 0))  # Red color for the arrow shaft
+
+        # Draw the arrowhead (extending at 45 degrees from the shaft)
+        for i in range(3):  # Adjust this range for arrowhead size
+            matrix.pixel((width - arrow_length + i, arrow_length - 1 - i), (255, 0, 0))
+            matrix.pixel((width - arrow_length - i, arrow_length - 1 - i), (255, 0, 0))
+
+        matrix.show()
+        matrix.delay(50)
+    print("Exiting caution effect.")
+
 def effect_clear():
     """Clear the matrix."""
     global stop_event
     if get_current_effect() == 'clear':
          # Clear the matrix first
         matrix.reset()
-
-        # # Coordinates for a simple thumbs-up
-        # # Adjust these based on your matrix size
-        # checkmark_pixels = [
-        #     (2, 9), (3, 10), (4, 11), (5, 12), (6, 13),
-        #     (1, 9), (2, 10), (3, 11), (4, 12), (5, 13),
-        #     (5, 14), (6, 13), (7, 12), (8, 11), (9, 10), (10, 9), (11, 8), (12, 7), (13, 6), (14, 5),
-        #     (5, 13), (6, 12), (7, 11), (8, 10), (9, 11), (10, 10), (11, 9), (12, 8), (13, 7), (14, 6),
-        # ]
-
-        # # Loop through each coordinate and light it up
-        # for x, y in checkmark_pixels:
-        #     matrix.pixel((x, y), (0, 128, 0))  # White color for thumbs-up
         arrow_height = 10  # Adjusted for a larger arrow
         width, height = 16, 16
         start_y = 5
@@ -258,6 +331,8 @@ def effect_lastLapAnimation():
 
 effects = {
     'caution': effect_caution,
+    'cautionRight': effect_caution_right,
+    'cautionLeft': effect_caution_left,
     'clearAnimation': effect_clearAnimation,
     'clear': effect_clear,
     'medical': effect_medical,
