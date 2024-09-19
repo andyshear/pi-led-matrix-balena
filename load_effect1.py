@@ -40,7 +40,7 @@ def effect_caution():
         for i in range(min(width, height)):
             # Draw from top-left to bottom-right
             matrix.pixel((i, i), (255, 0, 0))
-            matrix.pixel((i+1, i+1), (255, 0, 0))
+            matrix.pixel((i, i+1), (255, 0, 0))
             # Draw from top-right to bottom-left
             matrix.pixel((width - 1 - i, i), (255, 0, 0))
             matrix.pixel((width - 1 - i+1, i+1), (255, 0, 0))
