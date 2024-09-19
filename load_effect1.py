@@ -139,11 +139,11 @@ def effect_caution_left():
         arrowhead_depth = 5  # Depth of the arrowhead
         x_arrowhead = 5  # Depth of the arrowhead
         for x_offset in range(arrowhead_depth):
-        # Calculate the width of the arrowhead at this level
-        arrowhead_width = arrowhead_depth - x_offset
-        for y_offset in range(height // 2 - x_offset, height // 2 + x_offset + 1):
-            # Draw the arrowhead at the tip of the shaft (left end)
-            matrix.pixel((start_x - x_offset, y_offset), (255, 0, 0))  # Move the arrowhead to the left
+            # Calculate the width of the arrowhead at this level
+            arrowhead_width = arrowhead_depth - x_offset
+            for y_offset in range(height // 2 - x_offset, height // 2 + x_offset + 1):
+                # Draw the arrowhead at the tip of the shaft (left end)
+                matrix.pixel((start_x - x_offset, y_offset), (255, 0, 0))  # Move the arrowhead to the left
 
         matrix.show()
         # matrix.delay(50)
