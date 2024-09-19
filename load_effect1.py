@@ -105,21 +105,30 @@ def effect_caution_left():
         # Define the size of the matrix
         width = 16
         height = 16
-        
-        # # Draw 'X' by connecting opposite corners
-        # for i in range(min(width, height)):
-        #     # Draw from top-left to bottom-right
-        #     matrix.pixel((i, i), (255, 0, 0))
-        #     # Draw from top-right to bottom-left
-        #     matrix.pixel((width - 1 - i, i), (255, 0, 0))
-        # Draw the shaft of the arrow (diagonal from bottom-right to top-left)
-        for i in range(arrow_length):
-            matrix.pixel((width - 1 - i, i), (255, 0, 0))  # Red color for the arrow shaft
-
-        # Draw the arrowhead (extending at 45 degrees from the shaft)
-        for i in range(3):  # Adjust this range for arrowhead size
-            matrix.pixel((width - arrow_length + i, arrow_length - 1 - i), (255, 0, 0))
-            matrix.pixel((width - arrow_length - i, arrow_length - 1 - i), (255, 0, 0))
+        arrow_height = 10  # Adjusted for a larger arrow
+        start_y = 5
+        for y_offset in range(arrow_height):
+            # Calculate the current y position of this part of the arrow
+            current_y = start_y + y_offset
+            
+            if current_y < 0 or current_y >= height:
+                continue  # Skip drawing outside the matrix bounds
+            
+            # Larger Arrow shaft
+            if y_offset > 0:  # Skip the top 3 rows for the arrowhead
+                for x_offset in range(width // 2 - 1, width // 2 + 2):  # Widen the shaft
+                    matrix.pixel((x_offset, current_y), (255, 0, 0))
+            
+            # Arrowhead
+            arrowhead_depth = 5  # Depth of the arrowhead
+            for y_offset in range(arrowhead_depth):
+                # Draw the arrowhead for every y_offset without skipping
+                # Calculate the width of the arrowhead at this level
+                arrowhead_width = arrowhead_depth - y_offset
+                for x_offset in range(width // 2 - y_offset, width // 2 + y_offset + 1):
+                    # Adjust y position to start drawing from the top of the arrowhead
+                    current_y_position = start_y - arrowhead_depth + y_offset + 1
+                    matrix.pixel((x_offset, current_y_position), (255, 0, 0))
 
         matrix.show()
         matrix.delay(50)
@@ -129,20 +138,30 @@ def effect_caution_left():
         width = 16
         height = 16
         
-        # # Draw 'X' by connecting opposite corners
-        # for i in range(min(width, height)):
-        #     # Draw from top-left to bottom-right
-        #     matrix.pixel((i, i), (255, 0, 0))
-        #     # Draw from top-right to bottom-left
-        #     matrix.pixel((width - 1 - i, i), (255, 0, 0))
-        # Draw the shaft of the arrow (diagonal from bottom-right to top-left)
-        for i in range(arrow_length):
-            matrix.pixel((width - 1 - i, i), (255, 0, 0))  # Red color for the arrow shaft
-
-        # Draw the arrowhead (extending at 45 degrees from the shaft)
-        for i in range(3):  # Adjust this range for arrowhead size
-            matrix.pixel((width - arrow_length + i, arrow_length - 1 - i), (255, 0, 0))
-            matrix.pixel((width - arrow_length - i, arrow_length - 1 - i), (255, 0, 0))
+        arrow_height = 10  # Adjusted for a larger arrow
+        start_y = 5
+        for y_offset in range(arrow_height):
+            # Calculate the current y position of this part of the arrow
+            current_y = start_y + y_offset
+            
+            if current_y < 0 or current_y >= height:
+                continue  # Skip drawing outside the matrix bounds
+            
+            # Larger Arrow shaft
+            if y_offset > 0:  # Skip the top 3 rows for the arrowhead
+                for x_offset in range(width // 2 - 1, width // 2 + 2):  # Widen the shaft
+                    matrix.pixel((x_offset, current_y), (255, 0, 0))
+            
+            # Arrowhead
+            arrowhead_depth = 5  # Depth of the arrowhead
+            for y_offset in range(arrowhead_depth):
+                # Draw the arrowhead for every y_offset without skipping
+                # Calculate the width of the arrowhead at this level
+                arrowhead_width = arrowhead_depth - y_offset
+                for x_offset in range(width // 2 - y_offset, width // 2 + y_offset + 1):
+                    # Adjust y position to start drawing from the top of the arrowhead
+                    current_y_position = start_y - arrowhead_depth + y_offset + 1
+                    matrix.pixel((x_offset, current_y_position), (255, 0, 0))
 
         matrix.show()
         matrix.delay(50)
