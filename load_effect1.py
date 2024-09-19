@@ -40,26 +40,30 @@ def effect_caution():
         for i in range(min(width, height)):
             # Draw from top-left to bottom-right
             matrix.pixel((i, i), (255, 0, 0))
+            matrix.pixel((i+1, i+1), (255, 0, 0))
             # Draw from top-right to bottom-left
             matrix.pixel((width - 1 - i, i), (255, 0, 0))
+            matrix.pixel((width - 1 - i+1, i+1), (255, 0, 0))
 
         matrix.show()
-        matrix.delay(50)
-        matrix.reset()
+        # matrix.delay(50)
+        # matrix.reset(matrix.color('red'))
         
-        # Define the size of the matrix
-        width = 16
-        height = 16
+        # # Define the size of the matrix
+        # width = 16
+        # height = 16
         
-        # Draw 'X' by connecting opposite corners
-        for i in range(min(width, height)):
-            # Draw from top-left to bottom-right
-            matrix.pixel((i, i), (255, 0, 0))
-            # Draw from top-right to bottom-left
-            matrix.pixel((width - 1 - i, i), (255, 0, 0))
+        # # Draw 'X' by connecting opposite corners
+        # for i in range(min(width, height)):
+        #     # Draw from top-left to bottom-right
+        #     matrix.pixel((i, i), (255, 140, 0))
+        #     matrix.pixel((i+1, i+1), (255, 140, 0))
+        #     # Draw from top-right to bottom-left
+        #     matrix.pixel((width - 1 - i, i), (255, 140, 0))
+        #     matrix.pixel((width - 1 - i+1, i+1), (255, 140, 0))
 
-        matrix.show()
-        matrix.delay(50)
+        # matrix.show()
+        # matrix.delay(50)
     print("Exiting caution effect.")
 
 def effect_caution_right():
@@ -96,34 +100,34 @@ def effect_caution_right():
 
 
         matrix.show()
-        # matrix.delay(50)
-        # matrix.reset(matrix.color('red'))
+        matrix.delay(50)
+        matrix.reset(matrix.color('red'))
         
-        # # Draw the arrow shaft (horizontal now)
-        # for x_offset in range(arrow_height):
-        #     current_x = start_x + x_offset
+        # Draw the arrow shaft (horizontal now)
+        for x_offset in range(arrow_height):
+            current_x = start_x + x_offset
             
-        #     if current_x < 0 or current_x >= width:
-        #         continue  # Skip drawing outside the matrix bounds
+            if current_x < 0 or current_x >= width:
+                continue  # Skip drawing outside the matrix bounds
 
-        #     # Shaft width
-        #     if x_offset > 0:  # Skip the first few rows for the arrowhead
-        #         for y_offset in range(height // 2 - 1, height // 2 + 2):  # Widen the shaft vertically
-        #             matrix.pixel((current_x, y_offset), (255, 0, 0))  # Red color for the arrow shaft
+            # Shaft width
+            if x_offset > 0:  # Skip the first few rows for the arrowhead
+                for y_offset in range(height // 2 - 1, height // 2 + 2):  # Widen the shaft vertically
+                    matrix.pixel((current_x, y_offset), (255, 0, 0))  # Red color for the arrow shaft
 
-        # # Draw the arrowhead (facing right now)
-        # arrowhead_depth = 5  # Depth of the arrowhead
-        # x_arrowhead = 5  # Depth of the arrowhead
-        # for x_offset in range(arrowhead_depth):
-        #     # Calculate the width of the arrowhead at this level
-        #     arrowhead_width = arrowhead_depth - x_offset
-        #     for y_offset in range(height // 2 - x_offset, height // 2 + x_offset + 1):
-        #         # Reverse the arrowhead direction from right to left
-        #         matrix.pixel((start_x + arrow_height - arrowhead_depth - x_offset + 6, y_offset), (255, 140, 0))
+        # Draw the arrowhead (facing right now)
+        arrowhead_depth = 5  # Depth of the arrowhead
+        x_arrowhead = 5  # Depth of the arrowhead
+        for x_offset in range(arrowhead_depth):
+            # Calculate the width of the arrowhead at this level
+            arrowhead_width = arrowhead_depth - x_offset
+            for y_offset in range(height // 2 - x_offset, height // 2 + x_offset + 1):
+                # Reverse the arrowhead direction from right to left
+                matrix.pixel((start_x + arrow_height - arrowhead_depth - x_offset + 8, y_offset), (255, 140, 0))
 
 
-        # matrix.show()
-        # matrix.delay(50)
+        matrix.show()
+        matrix.delay(50)
     print("Exiting caution effect.")
 
 def effect_caution_left():
@@ -159,33 +163,33 @@ def effect_caution_left():
                 matrix.pixel((start_x + arrow_height - arrowhead_depth + x_offset - 8, y_offset), (255, 0, 0))
 
         matrix.show()
-        # matrix.delay(50)
-        # matrix.reset(matrix.color('red'))
+        matrix.delay(50)
+        matrix.reset(matrix.color('red'))
         
-        # # Draw the arrow shaft (horizontal now)
-        # for x_offset in range(arrow_height):
-        #     current_x = start_x + x_offset
+        # Draw the arrow shaft (horizontal now)
+        for x_offset in range(arrow_height):
+            current_x = start_x + x_offset
             
-        #     if current_x < 0 or current_x >= width:
-        #         continue  # Skip drawing outside the matrix bounds
+            if current_x < 0 or current_x >= width:
+                continue  # Skip drawing outside the matrix bounds
 
-        #     # Shaft width
-        #     if x_offset > 0:  # Skip the first few rows for the arrowhead
-        #         for y_offset in range(height // 2 - 1, height // 2 + 2):  # Widen the shaft vertically
-        #             matrix.pixel((current_x, y_offset), (255, 0, 0))  # Red color for the arrow shaft
+            # Shaft width
+            if x_offset > 0:  # Skip the first few rows for the arrowhead
+                for y_offset in range(height // 2 - 1, height // 2 + 2):  # Widen the shaft vertically
+                    matrix.pixel((current_x, y_offset), (255, 0, 0))  # Red color for the arrow shaft
 
-        # # Draw the arrowhead (facing right now)
-        # arrowhead_depth = 5  # Depth of the arrowhead
-        # x_arrowhead = 5  # Depth of the arrowhead
-        # for x_offset in range(arrowhead_depth):
-        #     # Calculate the width of the arrowhead at this level
-        #     arrowhead_width = arrowhead_depth - x_offset
-        #     for y_offset in range(height // 2 - x_offset, height // 2 + x_offset + 1):
-        #         # Draw the arrowhead at the tip of the shaft (right end)
-        #         matrix.pixel((start_x + arrow_height - arrowhead_depth + x_offset - 6, y_offset), (255, 140, 0))
+        # Draw the arrowhead (facing right now)
+        arrowhead_depth = 5  # Depth of the arrowhead
+        x_arrowhead = 5  # Depth of the arrowhead
+        for x_offset in range(arrowhead_depth):
+            # Calculate the width of the arrowhead at this level
+            arrowhead_width = arrowhead_depth - x_offset
+            for y_offset in range(height // 2 - x_offset, height // 2 + x_offset + 1):
+                # Draw the arrowhead at the tip of the shaft (right end)
+                matrix.pixel((start_x + arrow_height - arrowhead_depth + x_offset - 8, y_offset), (255, 140, 0))
 
-        # matrix.show()
-        # matrix.delay(50)
+        matrix.show()
+        matrix.delay(50)
     print("Exiting caution effect.")
 
 def effect_clear():
