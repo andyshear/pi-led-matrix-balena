@@ -43,7 +43,7 @@ def effect_caution():
             matrix.pixel((i, i+1), (255, 0, 0))
             # Draw from top-right to bottom-left
             matrix.pixel((width - 1 - i, i), (255, 0, 0))
-            matrix.pixel((width - 1 - i+1, i+1), (255, 0, 0))
+            matrix.pixel((width - 1 - i+1, i), (255, 0, 0))
 
         matrix.show()
         # matrix.delay(50)
