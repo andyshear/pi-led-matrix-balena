@@ -46,24 +46,24 @@ def effect_caution():
             matrix.pixel((width - 1 - i+1, i), (255, 0, 0))
 
         matrix.show()
-        # matrix.delay(50)
-        # matrix.reset(matrix.color('red'))
+        matrix.delay(50)
+        matrix.reset(matrix.color('red'))
         
-        # # Define the size of the matrix
-        # width = 16
-        # height = 16
+        # Define the size of the matrix
+        width = 16
+        height = 16
         
-        # # Draw 'X' by connecting opposite corners
-        # for i in range(min(width, height)):
-        #     # Draw from top-left to bottom-right
-        #     matrix.pixel((i, i), (255, 140, 0))
-        #     matrix.pixel((i+1, i+1), (255, 140, 0))
-        #     # Draw from top-right to bottom-left
-        #     matrix.pixel((width - 1 - i, i), (255, 140, 0))
-        #     matrix.pixel((width - 1 - i+1, i+1), (255, 140, 0))
+        # Draw 'X' by connecting opposite corners
+        for i in range(min(width, height)):
+            # Draw from top-left to bottom-right
+            matrix.pixel((i, i), (255, 140, 0))
+            matrix.pixel((i, i+1), (255, 140, 0))
+            # Draw from top-right to bottom-left
+            matrix.pixel((width - 1 - i, i), (255, 140, 0))
+            matrix.pixel((width - 1 - i+1, i), (255, 140, 0))
 
-        # matrix.show()
-        # matrix.delay(50)
+        matrix.show()
+        matrix.delay(50)
     print("Exiting caution effect.")
 
 def effect_caution_right():
