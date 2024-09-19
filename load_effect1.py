@@ -70,7 +70,7 @@ def effect_caution_right():
         # Define the size of the matrix
         width = 16
         height = 16
-        arrow_height = 13  # Adjusted for a larger arrow
+        arrow_height = 12  # Adjusted for a larger arrow
         start_x = 3
         # Draw the arrow shaft (horizontal now)
         for x_offset in range(arrow_height):
@@ -92,7 +92,7 @@ def effect_caution_right():
             arrowhead_width = arrowhead_depth - x_offset
             for y_offset in range(height // 2 - x_offset, height // 2 + x_offset + 1):
                 # Draw the arrowhead at the tip of the shaft (right end)
-                matrix.pixel((start_x + arrow_height - arrowhead_depth + x_offset - 3, y_offset), (255, 0, 0))
+                matrix.pixel((start_x + arrow_height - arrowhead_depth + x_offset + 3, y_offset), (255, 0, 0))
 
         matrix.show()
         # matrix.delay(50)
@@ -143,7 +143,7 @@ def effect_caution_left():
             arrowhead_width = arrowhead_depth - x_offset
             for y_offset in range(height // 2 - x_offset, height // 2 + x_offset + 1):
                 # Draw the arrowhead at the tip of the shaft (left end)
-                matrix.pixel((start_x - x_offset, y_offset), (255, 0, 0))  # Move the arrowhead to the left
+                matrix.pixel((start_x + arrow_height - arrowhead_depth + x_offset + 3, y_offset), (255, 0, 0))  # Move the arrowhead to the left
 
         matrix.show()
         # matrix.delay(50)
