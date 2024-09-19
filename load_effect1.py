@@ -126,7 +126,6 @@ def effect_caution_left():
             arrowhead_width = arrowhead_depth - x_offset
             # for y_offset in range(height // 2 - x_offset, height // 2 + x_offset + 1):
             for y_offset in range(height // 2 - x_offset + 3, height // 2 + x_offset -2):
-                print("y offset",y_offset)
                 # Draw the arrowhead at the tip of the shaft (right end)
                 matrix.pixel((start_x + arrow_height - arrowhead_depth + x_offset, y_offset), (255, 0, 0))
 
