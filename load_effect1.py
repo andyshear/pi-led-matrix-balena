@@ -101,29 +101,32 @@ def effect_caution_left():
     """Red, yellow, repeat."""
     while not stop_event.is_set() and get_current_effect() == 'cautionLeft':
         matrix.reset(matrix.color('yellow'))
-        arrow_length = 10  # Length of the arrow shaft
-        arrowhead_depth = 5  # Depth of the arrowhead
+        
         # Define the size of the matrix
         width = 16
         height = 16
-        # Draw the arrow shaft diagonally from bottom-left to top-right
-        for i in range(arrow_length):
-            x = i
-            y = height - 1 - i  # Inverse y-axis for the diagonal
-            if 0 <= x < width and 0 <= y < height:
-                matrix.pixel((x, y), (255, 0, 0))  # Red color for the shaft
+        arrow_height = 10  # Adjusted for a larger arrow
+        start_x = 5
+        # Draw the arrow shaft (horizontal now)
+        for x_offset in range(arrow_height):
+            current_x = start_x + x_offset
+            
+            if current_x < 0 or current_x >= width:
+                continue  # Skip drawing outside the matrix bounds
 
-        # Draw the arrowhead at the tip of the shaft
-        for i in range(arrowhead_depth):
-            x1 = arrow_length - i
-            y1 = height - 1 - arrow_length + i
-            x2 = arrow_length + i
-            y2 = height - 1 - arrow_length + i
+            # Shaft width
+            if x_offset > 0:  # Skip the first few rows for the arrowhead
+                for y_offset in range(height // 2 - 1, height // 2 + 2):  # Widen the shaft vertically
+                    matrix.pixel((current_x, y_offset), (255, 0, 0))  # Red color for the arrow shaft
 
-            if 0 <= x1 < width and 0 <= y1 < height:
-                matrix.pixel((x1, y1), (255, 0, 0))  # Red arrowhead part 1
-            if 0 <= x2 < width and 0 <= y2 < height:
-                matrix.pixel((x2, y2), (255, 0, 0))  # Red arrowhead part 2
+        # Draw the arrowhead (facing right now)
+        arrowhead_depth = 5  # Depth of the arrowhead
+        for x_offset in range(arrowhead_depth):
+            # Calculate the width of the arrowhead at this level
+            arrowhead_width = arrowhead_depth - x_offset
+            for y_offset in range(height // 2 - x_offset, height // 2 + x_offset + 1):
+                # Draw the arrowhead at the tip of the shaft (right end)
+                matrix.pixel((start_x + arrow_height - arrowhead_depth + x_offset, y_offset), (255, 0, 0))
 
         matrix.show()
         matrix.delay(50)
@@ -133,24 +136,28 @@ def effect_caution_left():
         width = 16
         height = 16
         
-        # Draw the arrow shaft diagonally from bottom-left to top-right
-        for i in range(arrow_length):
-            x = i
-            y = height - 1 - i  # Inverse y-axis for the diagonal
-            if 0 <= x < width and 0 <= y < height:
-                matrix.pixel((x, y), (255, 0, 0))  # Red color for the shaft
+        arrow_height = 10  # Adjusted for a larger arrow
+        start_x = 5
+        # Draw the arrow shaft (horizontal now)
+        for x_offset in range(arrow_height):
+            current_x = start_x + x_offset
+            
+            if current_x < 0 or current_x >= width:
+                continue  # Skip drawing outside the matrix bounds
 
-        # Draw the arrowhead at the tip of the shaft
-        for i in range(arrowhead_depth):
-            x1 = arrow_length - i
-            y1 = height - 1 - arrow_length + i
-            x2 = arrow_length + i
-            y2 = height - 1 - arrow_length + i
+            # Shaft width
+            if x_offset > 0:  # Skip the first few rows for the arrowhead
+                for y_offset in range(height // 2 - 1, height // 2 + 2):  # Widen the shaft vertically
+                    matrix.pixel((current_x, y_offset), (255, 0, 0))  # Red color for the arrow shaft
 
-            if 0 <= x1 < width and 0 <= y1 < height:
-                matrix.pixel((x1, y1), (255, 0, 0))  # Red arrowhead part 1
-            if 0 <= x2 < width and 0 <= y2 < height:
-                matrix.pixel((x2, y2), (255, 0, 0))  # Red arrowhead part 2
+        # Draw the arrowhead (facing right now)
+        arrowhead_depth = 5  # Depth of the arrowhead
+        for x_offset in range(arrowhead_depth):
+            # Calculate the width of the arrowhead at this level
+            arrowhead_width = arrowhead_depth - x_offset
+            for y_offset in range(height // 2 - x_offset, height // 2 + x_offset + 1):
+                # Draw the arrowhead at the tip of the shaft (right end)
+                matrix.pixel((start_x + arrow_height - arrowhead_depth + x_offset, y_offset), (255, 0, 0))
 
         matrix.show()
         matrix.delay(50)
