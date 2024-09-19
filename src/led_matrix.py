@@ -22,6 +22,7 @@ pixel_height = cfg['pixel_height']
 
 # brightness 0 - 1
 brightness = float(os.environ.get('BRIGHTNESS', 0.9))  # Ensure float brightness
+print("BRIGHTNESS",brightness)
 
 #contrast (1 is no change)
 contrast = cfg['contrast']
