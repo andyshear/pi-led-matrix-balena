@@ -137,7 +137,7 @@ def effect_caution_left():
         height = 16
         
         arrow_height = 10  # Adjusted for a larger arrow
-        start_x = 15
+        start_x = 5
         # Draw the arrow shaft (horizontal now)
         for x_offset in range(arrow_height):
             current_x = start_x + x_offset
@@ -152,12 +152,13 @@ def effect_caution_left():
 
         # Draw the arrowhead (facing right now)
         arrowhead_depth = 5  # Depth of the arrowhead
+        start_x_head = 15
         for x_offset in range(arrowhead_depth):
             # Calculate the width of the arrowhead at this level
             arrowhead_width = arrowhead_depth - x_offset
             for y_offset in range(height // 2 - x_offset, height // 2 + x_offset + 1):
                 # Draw the arrowhead at the tip of the shaft (right end)
-                matrix.pixel((start_x + arrow_height - arrowhead_depth + x_offset, y_offset), (255, 0, 0))
+                matrix.pixel((start_x_head + arrow_height - arrowhead_depth + x_offset, y_offset), (255, 0, 0))
 
         matrix.show()
         matrix.delay(50)
