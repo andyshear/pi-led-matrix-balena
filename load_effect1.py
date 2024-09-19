@@ -137,7 +137,7 @@ def effect_caution_left():
         height = 16
         
         arrow_height = 10  # Adjusted for a larger arrow
-        start_x = 5
+        start_x = 15
         # Draw the arrow shaft (horizontal now)
         for x_offset in range(arrow_height):
             current_x = start_x + x_offset
