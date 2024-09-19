@@ -8,6 +8,7 @@ import numpy as np
 from lib import colors
 from PIL import ImageEnhance, Image, ImageDraw, ImageFont
 from .lib import colors
+import os
 
 CUSTOM_CONFIG = exists('config.json')
 CONFIG = 'default_config.json' if not CUSTOM_CONFIG else 'config.json'
