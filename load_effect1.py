@@ -66,9 +66,9 @@ def effect_caution():
         matrix.delay(50)
     print("Exiting caution effect.")
 
-def effect_caution_right():
+def effect_caution_left():
     """Red, yellow, repeat."""
-    while not stop_event.is_set() and get_current_effect() == 'cautionRight':
+    while not stop_event.is_set() and get_current_effect() == 'cautionLeft':
         matrix.reset(matrix.color('yellow'))
         
         # Define the size of the matrix
@@ -130,9 +130,9 @@ def effect_caution_right():
         matrix.delay(50)
     print("Exiting caution effect.")
 
-def effect_caution_left():
+def effect_caution_right():
     """Red, yellow, repeat."""
-    while not stop_event.is_set() and get_current_effect() == 'cautionLeft':
+    while not stop_event.is_set() and get_current_effect() == 'cautionRight':
         matrix.reset(matrix.color('yellow'))
         
         # Define the size of the matrix
