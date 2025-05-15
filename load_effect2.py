@@ -373,11 +373,11 @@ def effect_lastLapAnimation():
         # Keep the pattern displayed for a while before checking if the effect should stop
         matrix.delay(1000)
 
-def effect_times():
+def effect_times(rider_data):
     """Display rider bike, name, and last lap time on the 32x16 matrix."""
     while not stop_event.is_set() and get_current_effect() == 'times':
-        # Assuming `rider_data` is passed in or globally set
-        if not hasattr(effect_times, 'rider_data') or not effect_times.rider_data:
+        # Parse the rider data passed as JSON
+        if rider_data is None:
             continue  # If no rider data, skip
 
         # Define matrix size
@@ -387,7 +387,8 @@ def effect_times():
         draw = ImageDraw.Draw(image)
         
         y_offset = 0
-        for rider in effect_times.rider_data:
+        # Iterate through each rider's data
+        for rider in rider_data:
             bike, name, time = rider.split(':')  # Assuming rider_data is a list of strings like "Bike:Name:Time"
             text = f"{bike} {name} {time}"
 
@@ -421,7 +422,7 @@ effects = {
     'times': effect_times,
 }
 
-def apply_effect(effect_name):
+def apply_effect(effect_name, rider_data=None):
     global stop_event, current_effect_thread
     if current_effect_thread is not None:
         stop_event.set()  # Signal the current effect to stop
@@ -429,25 +430,30 @@ def apply_effect(effect_name):
         stop_event.clear()  # Reset for the next effect
 
     set_current_effect(effect_name)  # Update the current effect
-    current_effect_thread = threading.Thread(target=effects[effect_name])
+    current_effect_thread = threading.Thread(target=effects[effect_name], args=(rider_data,))
     current_effect_thread.start()
 
 def listen_for_commands():
     """Continuously listen for new commands and apply effects accordingly."""
     while True:
-        new_effect = input("Enter new effect (caution, clear, clearAnimation, medical, lastLap) or 'exit' to quit: ")
-        if new_effect == 'exit':
-            if current_effect_thread is not None:
-                stop_event.set()
-                current_effect_thread.join()
-            break
-        if new_effect in effects:
-            apply_effect(new_effect)
-        else:
-            print(f"Unknown effect: {new_effect}")
+        input_data = sys.stdin.readline().strip()
+        
+        if not input_data:
+            continue
+        
+        try:
+            # Parse the incoming data
+            data = json.loads(input_data)
 
+            effect_name = data.get('effect', None)
+            rider_data = data.get('riderData', None)
+
+            if effect_name and effect_name in effects:
+                apply_effect(effect_name, rider_data)
+            else:
+                print(f"Unknown effect: {effect_name}")
+        except json.JSONDecodeError:
+            print("Invalid data received. Skipping...")
+        
 if __name__ == "__main__":
-    initial_effect = sys.argv[1] if len(sys.argv) > 1 else None
-    if initial_effect:
-        apply_effect(initial_effect)
     listen_for_commands()
