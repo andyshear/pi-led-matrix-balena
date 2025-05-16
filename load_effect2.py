@@ -435,16 +435,17 @@ def effect_times(rider_data):
 def get_bike_color(bike_name):
     """Return a color based on bike brand."""
     bike_colors = {
-        'beta': (255, 0, 0),        # Red for Beta
+        'beta': (135, 206, 250),    # Light Blue for Beta (Sky Blue)
         'gasgas': (255, 0, 0),      # Red for GasGas
         'honda': (255, 0, 0),       # Red for Honda
-        'husqvarna': (255, 255, 255),   # White for Husqvarna
+        'husqvarna': (255, 255, 255),  # White for Husqvarna
         'ktm': (255, 140, 0),       # Orange for KTM
         'kawasaki': (0, 255, 0),    # Green for Kawasaki
         'stark': (255, 0, 0),       # Red for Stark
-        'suzuki': (0, 140, 255),    # Yellow for Suzuki
+        'suzuki': (255, 255, 0),    # Yellow for Suzuki
         'yamaha': (0, 0, 255)       # Blue for Yamaha
     }
+
     
     # Default to white if no match
     return bike_colors.get(bike_name.lower(), (255, 255, 255))
