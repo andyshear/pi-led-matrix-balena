@@ -427,7 +427,7 @@ def effect_times(rider_data):
 
         matrix.show()  # Display the image on the matrix
         matrix.delay(FLASH_DELAY)  # Delay to control the flashing
-        matrix.reset()
+        matrix.reset(matrix.color('black'))
 
 # Helper function to return a color for each bike
 def get_bike_color(bike_name):
