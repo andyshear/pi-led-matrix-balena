@@ -391,7 +391,7 @@ def effect_times(rider_data):
         print(f"Processing rider_data: {rider_data}")
 
         try:
-            # Assuming rider_data is a string with riders in format "Bike-Name-RiderNumber:Time"
+            # Assuming rider_data is a string with riders in format "Bike-Name-RiderName:Time"
             rider_list = rider_data.split(',')  # Split by comma for multiple riders
             for rider in rider_list:
                 print(f"Processing RIDER data: {rider}")
@@ -402,23 +402,21 @@ def effect_times(rider_data):
                     print(f"Invalid rider data format for: {rider}. Skipping...")
                     continue  # Skip if format is wrong
                 
-                # Split the data into bike name, rider name, and lap time
-                bike_name = rider_parts[0]
-                rider_info = rider_parts[1]
-                time = rider_parts[2]
+                bike_name = rider_parts[0]  # e.g., kawasaki
+                rider_name = rider_parts[1]  # e.g., Shear
+                time = rider_parts[2]  # e.g., 1:12:02
 
                 # Now split the rider info into name and time
                 try:
-                    name, time = rider_info.split(':', 1)  # Split name and time
-                    # Update the last valid data
-                    last_valid_rider_data = f"{name}\n{time}"  # Only display name and time
+                    # Rider name and time are already separated, we don't need to split again
+                    last_valid_rider_data = f"{rider_name}\n{time}"  # Only display name and time
                 except ValueError:
                     print(f"Invalid time format for rider: {rider}. Skipping...")
                     continue  # Skip if time format is invalid
 
-                print(f"Bike: {bike_name}, Name: {name}, Time: {time}")
-                text_line1 = f"{name}"           # Line 1: Name
-                text_line2 = f"{time}"           # Line 2: Time
+                print(f"Bike: {bike_name}, Name: {rider_name}, Time: {time}")
+                text_line1 = f"{rider_name}"           # Line 1: Name
+                text_line2 = f"{time}"                 # Line 2: Time
 
                 # Get the bike color for the rider's name
                 bike_color = get_bike_color(bike_name)
