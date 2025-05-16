@@ -376,32 +376,37 @@ def effect_lastLapAnimation():
 def effect_times(rider_data):
     """Display rider bike, name, and last lap time on the 32x16 matrix."""
     while not stop_event.is_set() and get_current_effect() == 'times':
-        # Parse the rider data passed as JSON
+        # Ensure we have data
         if rider_data is None or len(rider_data) == 0:
             print("No rider data received, skipping...")
-            continue  # If no rider data, skip
+            continue  # Skip if no data
 
         # Define matrix size
         width, height = 32, 16
-        # Load default font (You can replace this with a more suitable font if needed)
+        # Load default font (or use a custom one if necessary)
         font = ImageFont.load_default() 
         image = Image.new("RGB", (width, height), (0, 0, 0))  # Create blank image
         draw = ImageDraw.Draw(image)
         
         y_offset = 0
         for rider in rider_data:
-            print(f"RIDER: {rider}")
+            print(f"Processing RIDER data: {rider}")
             try:
-                # Assuming rider format: "BIKE-NAME-TIME"
-                bike_name, time_str = rider.split('-')  # Split "BIKE-NAME-TIME" into bike and "name:time"
-                name, time = time_str.split(':')  # Further split "name:time" into name and time
+                # Assuming the format is "BIKE-NAME-TIME"
+                if len(rider.split('-')) != 2:
+                    print(f"Invalid rider data format for: {rider}. Skipping...")
+                    continue  # Skip if format is wrong
+                
+                # Split the data
+                bike_name, time_str = rider.split('-')  # Split into bike and time
+                name, time = time_str.split(':')  # Further split into name and time
+
+                # Validate time format
+                if len(time.split(':')) != 2:
+                    print(f"Invalid time format for rider: {rider}. Skipping...")
+                    continue
 
                 print(f"Bike: {bike_name}, Name: {name}, Time: {time}")
-
-                # Ensure we have a valid time format (e.g., "1:12:02")
-                if len(time.split(':')) != 3:
-                    print(f"Invalid time format for rider: {rider}")
-                    continue
 
                 # Prepare text to display
                 text = f"{bike_name} {name} {time}"
@@ -410,11 +415,10 @@ def effect_times(rider_data):
                 draw.text((0, y_offset), text, font=font, fill=(255, 255, 255))
                 y_offset += FONT_SIZE  # Move down for the next line of text
 
-                # If we exceed the height of the matrix, stop drawing
                 if y_offset >= height:
-                    break  # Stop if we reach the bottom of the matrix
-            except ValueError as e:
-                print(f"Invalid rider data format for: {rider}. Error: {e}")
+                    break  # Stop if we exceed matrix height
+            except Exception as e:
+                print(f"Error processing rider data: {rider}. Error: {str(e)}")
                 continue  # Skip invalid entries
 
         # Convert image to LED matrix-compatible format
