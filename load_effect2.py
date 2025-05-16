@@ -390,6 +390,7 @@ def effect_times(rider_data):
         y_offset = 0
         # Iterate through each rider's data
         for rider in rider_data:
+            print(f"RIDER: {rider}")
             bike, name, time = rider.split('-')  # Assuming rider_data is a list of strings like "Bike-Name-mm:ss:ms"
             text = f"{bike} {name} {time}"
 
