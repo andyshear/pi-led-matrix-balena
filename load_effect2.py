@@ -15,7 +15,7 @@ current_effect_thread = None  # Keep a reference to the current effect thread
 FLASH_DELAY = 200  # milliseconds for color change
 SCROLL_DELAY = 20  # milliseconds for scroll speed
 MESSAGE = "CAUTION"
-FONT_SIZE = 16  # Adjust as needed
+FONT_SIZE = 8  # Adjust as needed
 FONT_PATH = "path/to/font.ttf"  # Adjust the font path as necessary
 
 def set_current_effect(effect):
