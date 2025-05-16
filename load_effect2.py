@@ -383,7 +383,7 @@ def effect_times(rider_data):
 
         # Define matrix size
         width, height = 32, 16
-        font = ImageFont.load_default()  # Load default font
+        font = ImageFont.load_default()  # Load default font (you can adjust this later for a smaller font)
         image = Image.new("RGB", (width, height), (0, 0, 0))  # Create blank image
         draw = ImageDraw.Draw(image)
         
@@ -414,14 +414,19 @@ def effect_times(rider_data):
                     continue  # Skip if time format is invalid
 
                 print(f"Bike: {bike_name}, Name: {name}, Time: {time}")
-                text = f"{bike_name} {name}\n{time}"
+                text_line1 = f"{bike_name} {name}"  # Line 1: Bike and name
+                text_line2 = f"{time}"             # Line 2: Time
 
                 # Get the bike color
                 bike_color = get_bike_color(bike_name)
 
-                # Draw text on the image
-                draw.text((0, y_offset), text, font=font, fill=bike_color)
-                y_offset += FONT_SIZE  # Move down for next line of text
+                # Draw the first line (bike number and rider name)
+                draw.text((0, y_offset), text_line1, font=font, fill=bike_color)
+                y_offset += FONT_SIZE  # Move down for next line
+
+                # Draw the second line (time)
+                draw.text((0, y_offset), text_line2, font=font, fill=(255, 255, 255))  # White for time
+                y_offset += FONT_SIZE  # Move down for next line
 
                 if y_offset >= height:
                     break  # Stop if we exceed matrix height
@@ -464,9 +469,6 @@ def get_bike_color(bike_name):
     
     # Default to white if no match
     return bike_colors.get(bike_name.lower(), (255, 255, 255))
-
-
-
 
 
 effects = {
