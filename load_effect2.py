@@ -378,6 +378,7 @@ def effect_times(rider_data):
     """Display rider name and last lap time on the 32x16 matrix."""
     last_valid_rider_data = None  # Store last valid rider data
     while not stop_event.is_set() and get_current_effect() == 'times':
+        matrix.reset(matrix.color('black'))
         if rider_data is None or len(rider_data) == 0:
             print("No rider data received, skipping...")
             continue  # Skip if no data
@@ -425,10 +426,10 @@ def effect_times(rider_data):
                 pixel_color = image.getpixel((x, y))
                 matrix.pixel((x, y), pixel_color)
 
+        matrix.delay(200)
         matrix.show()  # Display the image on the matrix
         matrix.delay(FLASH_DELAY)  # Delay to control the flashing
-        matrix.reset(matrix.color('black'))
-        matrix.delay(200)
+        
 
 # Helper function to return a color for each bike
 def get_bike_color(bike_name):
