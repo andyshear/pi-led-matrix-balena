@@ -388,10 +388,15 @@ def effect_times(rider_data):
         draw = ImageDraw.Draw(image)
         
         y_offset = 0
-        print(f"Processing rider_data data: {rider_data}")
-        for rider in rider_data:
-            print(f"Processing RIDER data: {rider}")
-            try:
+        print(f"Processing rider_data: {rider_data}")
+
+        # Treat rider_data as a single string
+        try:
+            # Assuming rider_data is in the format "Bike-Name-1:12:02" and split by comma or some separator
+            rider_list = rider_data.split(',')  # Adjust this split to match your input format
+            for rider in rider_list:
+                print(f"Processing RIDER data: {rider}")
+                
                 # Check if the format is correct (BIKE-NAME-TIME)
                 if len(rider.split('-')) != 3:
                     print(f"Invalid rider data format for: {rider}. Skipping...")
@@ -415,9 +420,9 @@ def effect_times(rider_data):
 
                 if y_offset >= height:
                     break  # Stop if we exceed matrix height
-            except Exception as e:
-                print(f"Error processing rider data: {rider}. Error: {str(e)}")
-                continue  # Skip invalid entries
+        except Exception as e:
+            print(f"Error processing rider data: {rider_data}. Error: {str(e)}")
+            continue  # Skip invalid entries
 
         # Convert image to LED matrix-compatible format
         for x in range(width):
