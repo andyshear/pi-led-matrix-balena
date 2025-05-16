@@ -374,7 +374,7 @@ def effect_lastLapAnimation():
         matrix.delay(1000)
 
 def effect_times(rider_data):
-    """Display rider bike, number, and last lap time on the 32x16 matrix."""
+    """Display rider name and last lap time on the 32x16 matrix."""
     last_valid_rider_data = None  # Store last valid rider data
     while not stop_event.is_set() and get_current_effect() == 'times':
         if rider_data is None or len(rider_data) == 0:
@@ -391,36 +391,39 @@ def effect_times(rider_data):
         print(f"Processing rider_data: {rider_data}")
 
         try:
-            # Assuming rider_data is a string with riders in format "Bike-Name-1:12:02"
-            rider_list = rider_data.split(',')  # Adjust this split to match your input format
+            # Assuming rider_data is a string with riders in format "Bike-Name-RiderNumber:Time"
+            rider_list = rider_data.split(',')  # Split by comma for multiple riders
             for rider in rider_list:
                 print(f"Processing RIDER data: {rider}")
                 
-                # Check if the format is correct (BIKE-NAME-TIME)
-                if len(rider.split('-')) != 3:
+                # Check if the format is correct (Bike-Name-RiderName:Time)
+                rider_parts = rider.split('-')  # Split by dash
+                if len(rider_parts) != 3:
                     print(f"Invalid rider data format for: {rider}. Skipping...")
                     continue  # Skip if format is wrong
                 
-                # Split the data into bike name and rider info
-                bike_name, rider_data = rider.split('-', 1)
+                # Split the data into bike name, rider name, and lap time
+                bike_name = rider_parts[0]
+                rider_info = rider_parts[1]
+                time = rider_parts[2]
 
-                # Now split the rider data into name and time
+                # Now split the rider info into name and time
                 try:
-                    name, time = rider_data.split(':', 1)  # Split name and time
+                    name, time = rider_info.split(':', 1)  # Split name and time
                     # Update the last valid data
-                    last_valid_rider_data = f"{bike_name} {name}\n{time}"
+                    last_valid_rider_data = f"{name}\n{time}"  # Only display name and time
                 except ValueError:
                     print(f"Invalid time format for rider: {rider}. Skipping...")
                     continue  # Skip if time format is invalid
 
                 print(f"Bike: {bike_name}, Name: {name}, Time: {time}")
-                text_line1 = f"{bike_name} {name}"  # Line 1: Bike and name
-                text_line2 = f"{time}"             # Line 2: Time
+                text_line1 = f"{name}"           # Line 1: Name
+                text_line2 = f"{time}"           # Line 2: Time
 
-                # Get the bike color
+                # Get the bike color for the rider's name
                 bike_color = get_bike_color(bike_name)
 
-                # Draw the first line (bike number and rider name)
+                # Draw the first line (rider's name)
                 draw.text((0, y_offset), text_line1, font=font, fill=bike_color)
                 y_offset += FONT_SIZE  # Move down for next line
 
