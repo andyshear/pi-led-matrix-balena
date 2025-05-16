@@ -383,37 +383,35 @@ def effect_times(rider_data):
 
         # Define matrix size
         width, height = 32, 16
-        # Load default font (or use a custom one if necessary)
-        font = ImageFont.load_default() 
+        font = ImageFont.load_default()  # Load default font
         image = Image.new("RGB", (width, height), (0, 0, 0))  # Create blank image
         draw = ImageDraw.Draw(image)
         
         y_offset = 0
+        print(f"Processing rider_data data: {rider_data}")
         for rider in rider_data:
             print(f"Processing RIDER data: {rider}")
             try:
-                # Assuming the format is "BIKE-NAME-TIME"
-                if len(rider.split('-')) != 2:
+                # Check if the format is correct (BIKE-NAME-TIME)
+                if len(rider.split('-')) != 3:
                     print(f"Invalid rider data format for: {rider}. Skipping...")
                     continue  # Skip if format is wrong
                 
-                # Split the data
-                bike_name, time_str = rider.split('-')  # Split into bike and time
-                name, time = time_str.split(':')  # Further split into name and time
+                # Split the data into bike, name, and time
+                bike_name, name_time, time = rider.split('-')
+                name, time = name_time.split(':')  # Split the name and time
 
-                # Validate time format
+                # Validate the time format (should be "mm:ss:ms")
                 if len(time.split(':')) != 2:
                     print(f"Invalid time format for rider: {rider}. Skipping...")
-                    continue
+                    continue  # Skip if time format is invalid
 
                 print(f"Bike: {bike_name}, Name: {name}, Time: {time}")
-
-                # Prepare text to display
                 text = f"{bike_name} {name} {time}"
 
                 # Draw text on the image
                 draw.text((0, y_offset), text, font=font, fill=(255, 255, 255))
-                y_offset += FONT_SIZE  # Move down for the next line of text
+                y_offset += FONT_SIZE  # Move down for next line of text
 
                 if y_offset >= height:
                     break  # Stop if we exceed matrix height
@@ -429,7 +427,6 @@ def effect_times(rider_data):
 
         matrix.show()  # Update the matrix with new data
         matrix.delay(FLASH_DELAY)  # Delay for flashing
-
 
 
 
