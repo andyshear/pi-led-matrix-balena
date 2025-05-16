@@ -390,7 +390,7 @@ def effect_times(rider_data):
         draw = ImageDraw.Draw(image)
         
         y_offset = 0
-        print(f"Processing rider_data: {rider_data}")
+        # print(f"Processing rider_data: {rider_data}")
 
         try:
             rider_parts = rider_data.split('-')
@@ -399,11 +399,11 @@ def effect_times(rider_data):
                 continue  # Skip if format is wrong
 
             bike_name = rider_parts[0]  # e.g., kawasaki
-            rider_name = rider_parts[1]  # e.g., Shear
+            rider_name = rider_parts[1]  # e.g., #513
             time = rider_parts[2]  # e.g., 1:12:02
 
             # Only show rider name and time, with bike color
-            print(f"Bike: {bike_name}, Name: {rider_name}, Time: {time}")
+            # print(f"Bike: {bike_name}, Name: {rider_name}, Time: {time}")
 
             # Get the bike color for the rider's name
             bike_color = get_bike_color(bike_name)
