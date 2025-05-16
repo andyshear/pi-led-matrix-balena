@@ -12,7 +12,7 @@ stop_event = threading.Event()  # Define the stop event here
 current_effect_thread = None  # Keep a reference to the current effect thread
 
 # Define the delay for flashing and scrolling
-FLASH_DELAY = 200  # milliseconds for color change
+FLASH_DELAY = 500  # milliseconds for color change
 SCROLL_DELAY = 20  # milliseconds for scroll speed
 MESSAGE = "CAUTION"
 FONT_SIZE = 8  # Adjust as needed
@@ -406,11 +406,11 @@ def effect_times(rider_data):
 
             # Get the bike color for the rider's name
             bike_color = get_bike_color(bike_name)
-            print(f"y_offsetNAME: {y_offset-2}")
+            # print(f"y_offsetNAME: {y_offset-2}")
             # Draw the first line (rider's name)
             draw.text((0, y_offset-2), rider_name, font=font, fill=bike_color)
             y_offset += FONT_SIZE  # Move down for next line (make sure this doesn't overlap)
-            print(f"y_offsetTEXT: {y_offset-2}")
+            # print(f"y_offsetTEXT: {y_offset-2}")
             # Draw the second line (time)
             draw.text((0, y_offset-2), time, font=font, fill=(255, 255, 255))  # White for time
             y_offset += FONT_SIZE  # Move down for next line
@@ -427,19 +427,20 @@ def effect_times(rider_data):
 
         matrix.show()  # Display the image on the matrix
         matrix.delay(FLASH_DELAY)  # Delay to control the flashing
+        matrix.reset()
 
 # Helper function to return a color for each bike
 def get_bike_color(bike_name):
     """Return a color based on bike brand."""
     bike_colors = {
         'beta': (255, 0, 0),        # Red for Beta
-        'gasgas': (255, 165, 0),    # Orange for GasGas
+        'gasgas': (255, 0, 0),      # Red for GasGas
         'honda': (255, 0, 0),       # Red for Honda
-        'husqvarna': (0, 0, 255),   # Blue for Husqvarna
+        'husqvarna': (255, 255, 255),   # White for Husqvarna
         'ktm': (255, 140, 0),       # Orange for KTM
         'kawasaki': (0, 255, 0),    # Green for Kawasaki
-        'stark': (0, 0, 0),         # Black for Stark
-        'suzuki': (0, 0, 255),      # Blue for Suzuki
+        'stark': (255, 0, 0),       # Red for Stark
+        'suzuki': (0, 140, 255),    # Yellow for Suzuki
         'yamaha': (0, 0, 255)       # Blue for Yamaha
     }
     
