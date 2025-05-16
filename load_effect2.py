@@ -406,13 +406,13 @@ def effect_times(rider_data):
 
             # Get the bike color for the rider's name
             bike_color = get_bike_color(bike_name)
-            print(f"y_offsetNAME: {y_offset}")
+            print(f"y_offsetNAME: {y_offset-2}")
             # Draw the first line (rider's name)
-            draw.text((0, y_offset), rider_name, font=font, fill=bike_color)
+            draw.text((0, y_offset-2), rider_name, font=font, fill=bike_color)
             y_offset += FONT_SIZE  # Move down for next line (make sure this doesn't overlap)
-            print(f"y_offsetTEXT: {y_offset}")
+            print(f"y_offsetTEXT: {y_offset-2}")
             # Draw the second line (time)
-            draw.text((0, y_offset), time, font=font, fill=(255, 255, 255))  # White for time
+            draw.text((0, y_offset-2), time, font=font, fill=(255, 255, 255))  # White for time
             y_offset += FONT_SIZE  # Move down for next line
 
         except Exception as e:
