@@ -375,8 +375,8 @@ def effect_lastLapAnimation():
 
 def effect_times(rider_data):
     """Display rider bike, name, and last lap time on the 32x16 matrix."""
+    last_valid_rider_data = None  # Store last valid rider data
     while not stop_event.is_set() and get_current_effect() == 'times':
-        # Ensure we have data
         if rider_data is None or len(rider_data) == 0:
             print("No rider data received, skipping...")
             continue  # Skip if no data
@@ -390,7 +390,6 @@ def effect_times(rider_data):
         y_offset = 0
         print(f"Processing rider_data: {rider_data}")
 
-        # Treat rider_data as a single string
         try:
             # Assuming rider_data is a string with riders in format "Bike-Name-1:12:02"
             rider_list = rider_data.split(',')  # Adjust this split to match your input format
@@ -408,6 +407,8 @@ def effect_times(rider_data):
                 # Now split the rider data into name and time
                 try:
                     name, time = rider_data.split(':', 1)  # Split name and time
+                    # Update the last valid data
+                    last_valid_rider_data = f"{bike_name} {name} {time}"
                 except ValueError:
                     print(f"Invalid time format for rider: {rider}. Skipping...")
                     continue  # Skip if time format is invalid
@@ -421,18 +422,24 @@ def effect_times(rider_data):
 
                 if y_offset >= height:
                     break  # Stop if we exceed matrix height
+
         except Exception as e:
             print(f"Error processing rider data: {rider_data}. Error: {str(e)}")
             continue  # Skip invalid entries
 
+        # If no valid rider data, display last valid data instead
+        if not last_valid_rider_data:
+            print("No valid rider data, skipping display update...")
+            continue  # Skip the update if no valid data
+
+        # Use the last valid rider data for the display
+        draw.text((0, y_offset), last_valid_rider_data, font=font, fill=(255, 255, 255))
+        
         # Convert image to LED matrix-compatible format
         for x in range(width):
             for y in range(height):
                 pixel_color = image.getpixel((x, y))
-                matrix.pixel((x, y), pixel_color)  # Map image to LED matrix
-
-        matrix.show()  # Update the matrix with new data
-        matrix.delay(FLASH_DELAY)  # Delay for flashing
+                matrix.pixel((x,
 
 
 
