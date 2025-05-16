@@ -392,7 +392,7 @@ def effect_times(rider_data):
 
         # Treat rider_data as a single string
         try:
-            # Assuming rider_data is in the format "Bike-Name-1:12:02" and split by comma or some separator
+            # Assuming rider_data is a string with riders in format "Bike-Name-1:12:02"
             rider_list = rider_data.split(',')  # Adjust this split to match your input format
             for rider in rider_list:
                 print(f"Processing RIDER data: {rider}")
@@ -402,12 +402,13 @@ def effect_times(rider_data):
                     print(f"Invalid rider data format for: {rider}. Skipping...")
                     continue  # Skip if format is wrong
                 
-                # Split the data into bike, name, and time
-                bike_name, name_time, time = rider.split('-')
-                name, time = name_time.split(':')  # Split the name and time
+                # Split the data into bike name and rider info
+                bike_name, rider_data = rider.split('-', 1)
 
-                # Validate the time format (should be "mm:ss:ms")
-                if len(time.split(':')) != 2:
+                # Now split the rider data into name and time
+                try:
+                    name, time = rider_data.split(':', 1)  # Split name and time
+                except ValueError:
                     print(f"Invalid time format for rider: {rider}. Skipping...")
                     continue  # Skip if time format is invalid
 
