@@ -382,7 +382,8 @@ def effect_times(rider_data):
 
         # Define matrix size
         width, height = 32, 16
-        font = ImageFont.truetype(FONT_PATH, FONT_SIZE)  # Load font (adjust path and size)
+        # font = ImageFont.truetype(FONT_PATH, FONT_SIZE)  # Load font (adjust path and size)
+        font = ImageFont.load_default() 
         image = Image.new("RGB", (width, height), (0, 0, 0))  # Create blank image
         draw = ImageDraw.Draw(image)
         
