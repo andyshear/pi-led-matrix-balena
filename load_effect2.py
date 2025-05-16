@@ -391,15 +391,22 @@ def effect_times(rider_data):
         # Iterate through each rider's data
         for rider in rider_data:
             print(f"RIDER: {rider}")
-            bike, name, time = rider.split('-')  # Assuming rider_data is a list of strings like "Bike-Name-mm:ss:ms"
-            text = f"{bike} {name} {time}"
+            try:
+                bike_name, time_str = rider.split('-')  # Splitting into bike and "name:time"
+                name, time = time_str.split(':')  # Further split "name:time" into name and time
 
-            # Draw text on the image
-            draw.text((0, y_offset), text, font=font, fill=(255, 255, 255))
-            y_offset += FONT_SIZE  # Move down for next line of text
+                print(f"Bike: {bike_name}, Name: {name}, Time: {time}")
+                text = f"{bike_name} {name} {time}"
 
-            if y_offset >= height:
-                break  # Stop if we reach the bottom of the matrix
+                # Draw text on the image
+                draw.text((0, y_offset), text, font=font, fill=(255, 255, 255))
+                y_offset += FONT_SIZE  # Move down for next line of text
+
+                if y_offset >= height:
+                    break  # Stop if we reach the bottom of the matrix
+            except ValueError:
+                print(f"Invalid rider data format: {rider}")
+                continue  # Skip invalid entries
 
         # Convert image to LED matrix-compatible format
         for x in range(width):
