@@ -397,7 +397,7 @@ def effect_times(rider_data):
                 print(f"Processing RIDER data: {rider}")
                 
                 # Check if the format is correct (Bike-Name-RiderName:Time)
-                rider_parts = rider.split('-')  # Split by dash
+                rider_parts = rider.split('-')  # Split by dash to separate bike and name/time
                 if len(rider_parts) != 3:
                     print(f"Invalid rider data format for: {rider}. Skipping...")
                     continue  # Skip if format is wrong
