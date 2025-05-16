@@ -373,6 +373,7 @@ def effect_lastLapAnimation():
         # Keep the pattern displayed for a while before checking if the effect should stop
         matrix.delay(1000)
 
+# Fix: Ensure the function ends properly
 def effect_times(rider_data):
     """Display rider bike, name, and last lap time on the 32x16 matrix."""
     last_valid_rider_data = None  # Store last valid rider data
@@ -439,7 +440,10 @@ def effect_times(rider_data):
         for x in range(width):
             for y in range(height):
                 pixel_color = image.getpixel((x, y))
-                matrix.pixel((x,
+                matrix.pixel((x, y), pixel_color)
+
+        matrix.show()  # Display the image on the matrix
+        matrix.delay(FLASH_DELAY)
 
 
 
