@@ -391,59 +391,33 @@ def effect_times(rider_data):
         print(f"Processing rider_data: {rider_data}")
 
         try:
-            # Assuming rider_data is a string with riders in format "Bike-Name-RiderName:Time"
-            rider_list = rider_data.split(',')  # Split by comma for multiple riders
-            for rider in rider_list:
-                print(f"Processing RIDER data: {rider}")
-                
-                # Check if the format is correct (Bike-Name-RiderName:Time)
-                rider_parts = rider.split('-')  # Split by dash to separate bike and name/time
-                if len(rider_parts) != 3:
-                    print(f"Invalid rider data format for: {rider}. Skipping...")
-                    continue  # Skip if format is wrong
-                
-                bike_name = rider_parts[0]  # e.g., kawasaki
-                rider_name = rider_parts[1]  # e.g., Shear
-                time = rider_parts[2]  # e.g., 1:12:02
+            rider_parts = rider_data.split('-')
+            if len(rider_parts) != 3:
+                print(f"Invalid rider data format for: {rider_data}. Skipping...")
+                continue  # Skip if format is wrong
 
-                # Now split the rider info into name and time
-                try:
-                    # Rider name and time are already separated, we don't need to split again
-                    last_valid_rider_data = f"{rider_name}\n{time}"  # Only display name and time
-                except ValueError:
-                    print(f"Invalid time format for rider: {rider}. Skipping...")
-                    continue  # Skip if time format is invalid
+            bike_name = rider_parts[0]  # e.g., kawasaki
+            rider_name = rider_parts[1]  # e.g., Shear
+            time = rider_parts[2]  # e.g., 1:12:02
 
-                print(f"Bike: {bike_name}, Name: {rider_name}, Time: {time}")
-                text_line1 = f"{rider_name}"           # Line 1: Name
-                text_line2 = f"{time}"                 # Line 2: Time
+            # Only show rider name and time, with bike color
+            print(f"Bike: {bike_name}, Name: {rider_name}, Time: {time}")
 
-                # Get the bike color for the rider's name
-                bike_color = get_bike_color(bike_name)
+            # Get the bike color for the rider's name
+            bike_color = get_bike_color(bike_name)
 
-                # Draw the first line (rider's name)
-                draw.text((0, y_offset), text_line1, font=font, fill=bike_color)
-                y_offset += FONT_SIZE  # Move down for next line
+            # Draw the first line (rider's name)
+            draw.text((0, y_offset), rider_name, font=font, fill=bike_color)
+            y_offset += FONT_SIZE  # Move down for next line
 
-                # Draw the second line (time)
-                draw.text((0, y_offset), text_line2, font=font, fill=(255, 255, 255))  # White for time
-                y_offset += FONT_SIZE  # Move down for next line
-
-                if y_offset >= height:
-                    break  # Stop if we exceed matrix height
+            # Draw the second line (time)
+            draw.text((0, y_offset), time, font=font, fill=(255, 255, 255))  # White for time
+            y_offset += FONT_SIZE  # Move down for next line
 
         except Exception as e:
             print(f"Error processing rider data: {rider_data}. Error: {str(e)}")
             continue  # Skip invalid entries
 
-        # If no valid rider data, display last valid data instead
-        if not last_valid_rider_data:
-            print("No valid rider data, skipping display update...")
-            continue  # Skip the update if no valid data
-
-        # Use the last valid rider data for the display
-        draw.text((0, y_offset), last_valid_rider_data, font=font, fill=(255, 255, 255))
-        
         # Convert image to LED matrix-compatible format
         for x in range(width):
             for y in range(height):
@@ -451,7 +425,7 @@ def effect_times(rider_data):
                 matrix.pixel((x, y), pixel_color)
 
         matrix.show()  # Display the image on the matrix
-        matrix.delay(FLASH_DELAY)
+        matrix.delay(FLASH_DELAY)  # Delay to control the flashing
 
 # Helper function to return a color for each bike
 def get_bike_color(bike_name):
@@ -470,6 +444,7 @@ def get_bike_color(bike_name):
     
     # Default to white if no match
     return bike_colors.get(bike_name.lower(), (255, 255, 255))
+
 
 
 effects = {
