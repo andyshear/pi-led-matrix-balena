@@ -373,6 +373,7 @@ def effect_lastLapAnimation():
         # Keep the pattern displayed for a while before checking if the effect should stop
         matrix.delay(1000)
 
+# Adjust the code to make sure the rider's name and time are placed closer together
 def effect_times(rider_data):
     """Display rider name and last lap time on the 32x16 matrix."""
     last_valid_rider_data = None  # Store last valid rider data
@@ -408,7 +409,7 @@ def effect_times(rider_data):
 
             # Draw the first line (rider's name)
             draw.text((0, y_offset), rider_name, font=font, fill=bike_color)
-            y_offset += FONT_SIZE  # Move down for next line
+            y_offset += FONT_SIZE  # Move down for next line (make sure this doesn't overlap)
 
             # Draw the second line (time)
             draw.text((0, y_offset), time, font=font, fill=(255, 255, 255))  # White for time
