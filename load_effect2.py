@@ -373,9 +373,8 @@ def effect_lastLapAnimation():
         # Keep the pattern displayed for a while before checking if the effect should stop
         matrix.delay(1000)
 
-# Fix: Ensure the function ends properly
 def effect_times(rider_data):
-    """Display rider bike, name, and last lap time on the 32x16 matrix."""
+    """Display rider bike, number, and last lap time on the 32x16 matrix."""
     last_valid_rider_data = None  # Store last valid rider data
     while not stop_event.is_set() and get_current_effect() == 'times':
         if rider_data is None or len(rider_data) == 0:
@@ -409,16 +408,19 @@ def effect_times(rider_data):
                 try:
                     name, time = rider_data.split(':', 1)  # Split name and time
                     # Update the last valid data
-                    last_valid_rider_data = f"{bike_name} {name} {time}"
+                    last_valid_rider_data = f"{bike_name} {name}\n{time}"
                 except ValueError:
                     print(f"Invalid time format for rider: {rider}. Skipping...")
                     continue  # Skip if time format is invalid
 
                 print(f"Bike: {bike_name}, Name: {name}, Time: {time}")
-                text = f"{bike_name} {name} {time}"
+                text = f"{bike_name} {name}\n{time}"
+
+                # Get the bike color
+                bike_color = get_bike_color(bike_name)
 
                 # Draw text on the image
-                draw.text((0, y_offset), text, font=font, fill=(255, 255, 255))
+                draw.text((0, y_offset), text, font=font, fill=bike_color)
                 y_offset += FONT_SIZE  # Move down for next line of text
 
                 if y_offset >= height:
@@ -444,6 +446,26 @@ def effect_times(rider_data):
 
         matrix.show()  # Display the image on the matrix
         matrix.delay(FLASH_DELAY)
+
+# Helper function to return a color for each bike
+def get_bike_color(bike_name):
+    """Return a color based on bike brand."""
+    bike_colors = {
+        'beta': (255, 0, 0),        # Red for Beta
+        'gasgas': (255, 165, 0),    # Orange for GasGas
+        'honda': (255, 0, 0),       # Red for Honda
+        'husqvarna': (0, 0, 255),   # Blue for Husqvarna
+        'ktm': (255, 140, 0),       # Orange for KTM
+        'kawasaki': (0, 255, 0),    # Green for Kawasaki
+        'stark': (0, 0, 0),         # Black for Stark
+        'suzuki': (0, 0, 255),      # Blue for Suzuki
+        'yamaha': (0, 0, 255)       # Blue for Yamaha
+    }
+    
+    # Default to white if no match
+    return bike_colors.get(bike_name.lower(), (255, 255, 255))
+
+
 
 
 
