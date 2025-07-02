@@ -430,6 +430,54 @@ def effect_times(rider_data):
         matrix.show()  # Display the image on the matrix
         matrix.delay(FLASH_DELAY)  # Delay to control the flashing
         
+# Adjust the code to make sure the rider's name and time are placed closer together
+def effect_startGateCountdown(rider_data):
+    """Display '30', then '5', then flash green 3 times, then turn off."""
+
+    width, height = 16, 16
+    font = ImageFont.load_default()
+    
+    def draw_text_on_matrix(text, color):
+        image = Image.new("RGB", (width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        text_width, text_height = draw.textsize(text, font=font)
+        x = max((width - text_width) // 2, 0)
+        y = max((height - text_height) // 2, 0)
+        draw.text((x, y), text, font=font, fill=color)
+        for x in range(width):
+            for y in range(height):
+                matrix.pixel((x, y), image.getpixel((x, y)))
+        matrix.show()
+
+    if stop_event.is_set():
+        return
+
+    print("Start Gate Countdown: Showing 30")
+    draw_text_on_matrix("30", (255, 255, 255))  # White "30"
+    matrix.delay(25000)  # Wait 25s
+
+    if stop_event.is_set() or get_current_effect() != 'startGateCountdown':
+        return
+
+    print("Start Gate Countdown: Showing 5")
+    draw_text_on_matrix("5", (255, 0, 0))  # Red "5"
+    matrix.delay(5000)  # Wait 5s
+
+    if stop_event.is_set() or get_current_effect() != 'startGateCountdown':
+        return
+
+    print("Start Gate Countdown: Flashing green")
+    for _ in range(3):
+        matrix.fill((0, 255, 0))  # Bright green
+        matrix.show()
+        matrix.delay(300)
+        matrix.fill((0, 0, 0))  # Off
+        matrix.show()
+        matrix.delay(300)
+
+    matrix.fill((0, 0, 0))  # Clear display
+    matrix.show()
+
 
 # Helper function to return a color for each bike
 def get_bike_color(bike_name):
@@ -463,6 +511,7 @@ effects = {
     'lastLap': effect_lastLap,
     'off': effect_off,
     'times': effect_times,
+    'startGateCountdown': effect_startGateCountdown,
 }
 
 def apply_effect(effect_name, rider_data=None):
