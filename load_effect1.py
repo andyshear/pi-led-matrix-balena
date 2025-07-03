@@ -417,15 +417,20 @@ def effect_startGateCountdown():
 
     # Step 3: Flash green 3 times
     print("Start Gate Countdown: Flashing green")
-    for _ in range(3):
-        matrix.fill((0, 255, 0))  # Bright green
+    for x in range(32):
+        for y in range(16):
+            matrix.pixel((x, y), (0, 255, 0))  # Bright green
         matrix.show()
         matrix.delay(300)
-        matrix.fill((0, 0, 0))  # Off
+        for x in range(32):
+            for y in range(16):
+                matrix.pixel((x, y), (0, 0, 0))  # Off
         matrix.show()
         matrix.delay(300)
 
-    matrix.fill((0, 0, 0))  # Clear at end
+    for x in range(32):
+        for y in range(16):
+            matrix.pixel((x, y), (0, 0, 0))  # Off
     matrix.show()
 
 
