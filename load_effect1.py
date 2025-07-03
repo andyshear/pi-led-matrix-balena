@@ -397,11 +397,11 @@ def effect_startGateCountdown():
     if stop_event.is_set():
         return
 
-    # Step 1: Show "30"
-    print("Start Gate Countdown: Showing 30")
+    # Step 1: Show "15"
+    print("Start Gate Countdown: Showing 15")
     matrix.reset(matrix.color('black'))
-    render_text_frame("30", (255, 255, 255))  # White text
-    matrix.delay(25000)
+    render_text_frame("15", (255, 255, 255))  # White text
+    matrix.delay(10000)
 
     if stop_event.is_set() or get_current_effect() != 'startGateCountdown':
         return
@@ -409,7 +409,7 @@ def effect_startGateCountdown():
     # Step 2: Show "5"
     print("Start Gate Countdown: Showing 5")
     matrix.reset(matrix.color('black'))
-    render_text_frame("5", (255, 0, 0))  # Red text
+    render_text_frame("5", (255, 255, 255))  # Red text
     matrix.delay(5000)
 
     if stop_event.is_set() or get_current_effect() != 'startGateCountdown':
@@ -417,20 +417,34 @@ def effect_startGateCountdown():
 
     # Step 3: Flash green 3 times
     print("Start Gate Countdown: Flashing green")
-    for x in range(32):
-        for y in range(16):
-            matrix.pixel((x, y), (0, 255, 0))  # Bright green
-        matrix.show()
-        matrix.delay(300)
-        for x in range(32):
-            for y in range(16):
-                matrix.pixel((x, y), (0, 0, 0))  # Off
-        matrix.show()
-        matrix.delay(300)
+    matrix.reset()
+    arrow_height = 10  # Adjusted for a larger arrow
+    width, height = 16, 16
+    start_y = 5
+    for y_offset in range(arrow_height):
+        # Calculate the current y position of this part of the arrow
+        current_y = start_y + y_offset
+        
+        if current_y < 0 or current_y >= height:
+            continue  # Skip drawing outside the matrix bounds
+        
+        # Larger Arrow shaft
+        if y_offset > 0:  # Skip the top 3 rows for the arrowhead
+            for x_offset in range(width // 2 - 1, width // 2 + 2):  # Widen the shaft
+                matrix.pixel((x_offset, current_y), (0, 128, 0))
+        
+        # Arrowhead
+        arrowhead_depth = 5  # Depth of the arrowhead
+        for y_offset in range(arrowhead_depth):
+            # Draw the arrowhead for every y_offset without skipping
+            # Calculate the width of the arrowhead at this level
+            arrowhead_width = arrowhead_depth - y_offset
+            for x_offset in range(width // 2 - y_offset, width // 2 + y_offset + 1):
+                # Adjust y position to start drawing from the top of the arrowhead
+                current_y_position = start_y - arrowhead_depth + y_offset + 1
+                matrix.pixel((x_offset, current_y_position), (0, 128, 0))
 
-    for x in range(32):
-        for y in range(16):
-            matrix.pixel((x, y), (0, 0, 0))  # Off
+    # Display the updated matrix
     matrix.show()
 
 
