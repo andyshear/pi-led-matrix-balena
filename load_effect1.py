@@ -399,16 +399,16 @@ def effect_startGateCountdown():
 
     # Step 1: Show "15"
     print("Start Gate Countdown: Showing 15")
-    matrix.reset(matrix.color('black'))
+    matrix.reset()
     render_text_frame("15", (255, 255, 255))  # White text
-    matrix.delay(10000)
+    matrix.delay(15000)
 
     if stop_event.is_set() or get_current_effect() != 'startGateCountdown':
         return
 
     # Step 2: Show "5"
     print("Start Gate Countdown: Showing 5")
-    matrix.reset(matrix.color('black'))
+    matrix.reset()
     render_text_frame("5", (255, 255, 255))  # Red text
     matrix.delay(5000)
 
