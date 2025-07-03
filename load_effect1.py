@@ -375,50 +375,60 @@ def effect_lastLapAnimation():
 
 def effect_startGateCountdown():
     """Display '30', then '5', then flash green 3 times, then turn off."""
+    from PIL import Image, ImageDraw, ImageFont
 
-    width, height = 16, 16
+    width, height = 32, 16  # Match scoreboard resolution
     font = ImageFont.load_default()
-    
-    def draw_text_on_matrix(text, color):
+
+    def render_text_frame(text, color):
         image = Image.new("RGB", (width, height), (0, 0, 0))
         draw = ImageDraw.Draw(image)
-        text_width, text_height = draw.textsize(text, font=font)
+
+        # Compute positioning to center the text
+        text_width, text_height = font.getsize(text)
         x = max((width - text_width) // 2, 0)
         y = max((height - text_height) // 2, 0)
+
         draw.text((x, y), text, font=font, fill=color)
-        for x in range(width):
-            for y in range(height):
-                matrix.pixel((x, y), image.getpixel((x, y)))
+
+        # Draw pixels to matrix
+        for px in range(width):
+            for py in range(height):
+                matrix.pixel((px, py), image.getpixel((px, py)))
         matrix.show()
 
     if stop_event.is_set():
         return
 
+    # Step 1: Show "30"
     print("Start Gate Countdown: Showing 30")
-    draw_text_on_matrix("30", (255, 255, 255))  # White "30"
+    render_text_frame("30", (255, 255, 255))
     matrix.delay(25000)  # Wait 25s
 
     if stop_event.is_set() or get_current_effect() != 'startGateCountdown':
         return
 
+    # Step 2: Show "5"
     print("Start Gate Countdown: Showing 5")
-    draw_text_on_matrix("5", (255, 0, 0))  # Red "5"
-    matrix.delay(5000)  # Wait 5s
+    render_text_frame("5", (255, 0, 0))
+    matrix.delay(5000)
 
     if stop_event.is_set() or get_current_effect() != 'startGateCountdown':
         return
 
+    # Step 3: Flash green
     print("Start Gate Countdown: Flashing green")
     for _ in range(3):
-        matrix.fill((0, 255, 0))  # Bright green
+        matrix.fill((0, 255, 0))
         matrix.show()
         matrix.delay(300)
-        matrix.fill((0, 0, 0))  # Off
+        matrix.fill((0, 0, 0))
         matrix.show()
         matrix.delay(300)
 
-    matrix.fill((0, 0, 0))  # Clear display
+    matrix.fill((0, 0, 0))
     matrix.show()
+
 
 effects = {
     'caution': effect_caution,
