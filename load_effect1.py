@@ -377,7 +377,7 @@ def effect_startGateCountdown():
     """Display '30', then '5', then flash green 3 times, then turn off."""
     from PIL import Image, ImageDraw, ImageFont
 
-    width, height = 32, 16  # Match your matrix
+    width, height = 16, 16  # Match your matrix
     font = ImageFont.load_default()
 
     def render_text_frame(text, color):
