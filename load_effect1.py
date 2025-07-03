@@ -373,7 +373,7 @@ def effect_lastLapAnimation():
         # Keep the pattern displayed for a while before checking if the effect should stop
         matrix.delay(1000)
 
-def effect_startGateCountdown(rider_data):
+def effect_startGateCountdown():
     """Display '30', then '5', then flash green 3 times, then turn off."""
 
     width, height = 16, 16
