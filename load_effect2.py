@@ -430,28 +430,25 @@ def effect_times(rider_data):
         matrix.show()  # Display the image on the matrix
         matrix.delay(FLASH_DELAY)  # Delay to control the flashing
         
-def effect_startGateCountdown(rider_data):
+def effect_startGateCountdown():
     """Display '30', then '5', then flash green 3 times, then turn off."""
     from PIL import Image, ImageDraw, ImageFont
 
-    width, height = 32, 16  # Match scoreboard resolution
+    width, height = 32, 16  # Match your matrix
     font = ImageFont.load_default()
 
     def render_text_frame(text, color):
         image = Image.new("RGB", (width, height), (0, 0, 0))
         draw = ImageDraw.Draw(image)
 
-        # Compute positioning to center the text
-        text_width, text_height = font.getsize(text)
-        x = max((width - text_width) // 2, 0)
-        y = max((height - text_height) // 2, 0)
+        y_offset = 0
+        draw.text((0, y_offset), text, font=font, fill=color)
 
-        draw.text((x, y), text, font=font, fill=color)
+        for x in range(width):
+            for y in range(height):
+                pixel_color = image.getpixel((x, y))
+                matrix.pixel((x, y), pixel_color)
 
-        # Draw pixels to matrix
-        for px in range(width):
-            for py in range(height):
-                matrix.pixel((px, py), image.getpixel((px, py)))
         matrix.show()
 
     if stop_event.is_set():
@@ -459,31 +456,33 @@ def effect_startGateCountdown(rider_data):
 
     # Step 1: Show "30"
     print("Start Gate Countdown: Showing 30")
-    render_text_frame("30", (255, 255, 255))
-    matrix.delay(25000)  # Wait 25s
+    matrix.reset(matrix.color('black'))
+    render_text_frame("30", (255, 255, 255))  # White text
+    matrix.delay(25000)
 
     if stop_event.is_set() or get_current_effect() != 'startGateCountdown':
         return
 
     # Step 2: Show "5"
     print("Start Gate Countdown: Showing 5")
-    render_text_frame("5", (255, 0, 0))
+    matrix.reset(matrix.color('black'))
+    render_text_frame("5", (255, 0, 0))  # Red text
     matrix.delay(5000)
 
     if stop_event.is_set() or get_current_effect() != 'startGateCountdown':
         return
 
-    # Step 3: Flash green
+    # Step 3: Flash green 3 times
     print("Start Gate Countdown: Flashing green")
     for _ in range(3):
-        matrix.fill((0, 255, 0))
+        matrix.fill((0, 255, 0))  # Bright green
         matrix.show()
         matrix.delay(300)
-        matrix.fill((0, 0, 0))
+        matrix.fill((0, 0, 0))  # Off
         matrix.show()
         matrix.delay(300)
 
-    matrix.fill((0, 0, 0))
+    matrix.fill((0, 0, 0))  # Clear at end
     matrix.show()
 
 
