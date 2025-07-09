@@ -419,6 +419,11 @@ def effect_startGateCountdown():
     print("Start Gate Countdown: Flashing green")
     while not stop_event.is_set() and get_current_effect() == 'startGateCountdown':
         matrix.reset()
+        render_text_frame("GO!", (255, 255, 255))  # Red text
+        matrix.show()
+        matrix.delay(200)
+        matrix.reset()
+        
         arrow_height = 10  # Adjusted for a larger arrow
         width, height = 16, 16
         start_y = 5
