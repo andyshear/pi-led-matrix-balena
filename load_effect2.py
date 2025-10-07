@@ -494,7 +494,7 @@ def _put_pixel(matrix, x, y, color):
 
 # ====== MAIN EFFECT with optional diagnostics ======
 # Trigger diagnostics by calling: effect_times(rider_data="__TEST__") OR effect_times(rider_data, test_mode=True)
-def effect_times(rider_data, test_mode=False):
+def effect_times(rider_data, test_mode=True):
     """
     Normal: current/previous rider on a 32x32 (2x2) WS2812 wall.
     Diagnostics: when test_mode=True or rider_data == "__TEST__", run panel tests, then resume normal.
