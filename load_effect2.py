@@ -607,7 +607,7 @@ def get_bike_color(bike_name):
         'kawasaki': (0, 255, 0),    # Green for Kawasaki
         'stark': (255, 0, 0),       # Red for Stark
         'suzuki': (255, 255, 0),    # Yellow for Suzuki
-        'yamaha': (0, 0, 255)       # Blue for Yamaha
+        'yamaha': (80, 160, 255)   # Lighter, brighter Yamaha blue
     }
 
     
