@@ -496,7 +496,50 @@ def effect_times(_initial_rider_data_ignored):
             cur_scroll = 0 if cur_top_w <= pane_w else cur_scroll % cur_top_w
 
         if this_prev_key != prev_key:
-            prev_entry = (previous[0], previous[1], str(p_
+            prev_entry = (previous[0], previous[1], str(prev_laps), previous[3])
+            prev_top_surface, prev_top_w, prev_bot_surface = make_surfaces(prev_entry, dim=True)
+            prev_key = this_prev_key
+            prev_scroll = 0 if prev_top_w <= pane_w else prev_scroll % prev_top_w
+
+        # compose final frame
+        frame = Image.new("RGB", (width, height), (0, 0, 0))
+
+        # LEFT PANE (current)
+        if cur_top_surface is not None:
+            if cur_top_w <= pane_w:
+                frame.paste(cur_top_surface.crop((0, 0, pane_w, height)), (0, 0))
+            else:
+                x0 = cur_scroll % cur_top_w
+                w1 = min(pane_w, cur_top_w - x0)
+                frame.paste(cur_top_surface.crop((x0, 0, x0 + w1, height)), (0, 0))
+                if w1 < pane_w:
+                    frame.paste(cur_top_surface.crop((0, 0, pane_w - w1, height)), (w1, 0))
+                cur_scroll = (cur_scroll + SCROLL_PX_PER_FRAME) % cur_top_w
+
+        if cur_bot_surface is not None:
+            frame.paste(cur_bot_surface, (0, 0))  # static bottom line
+
+        # RIGHT PANE (previous)
+        if prev_top_surface is not None:
+            if prev_top_w <= pane_w:
+                frame.paste(prev_top_surface.crop((0, 0, pane_w, height)), (pane_w, 0))
+            else:
+                x0 = prev_scroll % prev_top_w
+                w1 = min(pane_w, prev_top_w - x0)
+                frame.paste(prev_top_surface.crop((x0, 0, x0 + w1, height)), (pane_w, 0))
+                if w1 < pane_w:
+                    frame.paste(prev_top_surface.crop((0, 0, pane_w - w1, height)), (pane_w + w1, 0))
+                prev_scroll = (prev_scroll + SCROLL_PX_PER_FRAME) % prev_top_w
+
+        if prev_bot_surface is not None:
+            frame.paste(prev_bot_surface, (pane_w, 0))  # static bottom line
+
+        # push pixels
+        for x in range(width):
+            for y in range(height):
+                matrix.pixel((x, y), frame.getpixel((x, y)))
+        matrix.show()
+        matrix.delay(IDLE_SLEEP_MS)
 
         
 def effect_startGateCountdown():
