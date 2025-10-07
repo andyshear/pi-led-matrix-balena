@@ -5,7 +5,7 @@ from src.led_matrix import Matrix, pixel_height, pixel_width
 from PIL import Image, ImageDraw, ImageFont
 from collections import deque
 # Optional override: 'auto' | 'wide16x64' | 'tall32x32'
-FORCE_LAYOUT = 'auto'   # set to 'wide16x64' if you want to force side-by-side
+FORCE_LAYOUT = 'wide16x64'   # set to 'wide16x64' if you want to force side-by-side
 
 # Initialize global variables for effect control
 current_effect = None
