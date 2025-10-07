@@ -4,6 +4,8 @@ import threading
 from src.led_matrix import Matrix, pixel_height, pixel_width
 from PIL import Image, ImageDraw, ImageFont
 from collections import deque
+# Optional override: 'auto' | 'wide16x64' | 'tall32x32'
+FORCE_LAYOUT = 'auto'   # set to 'wide16x64' if you want to force side-by-side
 
 # Initialize global variables for effect control
 current_effect = None
@@ -377,80 +379,101 @@ def effect_lastLapAnimation():
 # Adjust the code to make sure the rider's name and time are placed closer together
 def effect_times(rider_data):
     """
-    Display current rider (name + last lap) on rows 0–15 and the previous
-    valid rider on rows 16–31 of a 32x32 (w x h) stacked matrix.
-    Maintains vertical spacing and guarantees something on the bottom row.
+    Shows the most recent rider and lap, plus the previous one.
+    - If matrix is 16x64 (wide): current = left 32x16, previous = right 32x16.
+    - If matrix is 32x32 (tall): current = top 16px (2 lines), previous = bottom 16px (2 lines).
+    Vertical spacing between name and time is exactly 0 pixels.
     """
-    # Keep the last two DISTINCT payloads
-    history = deque(maxlen=2)  # rightmost = most recent
+    history = deque(maxlen=2)  # [older, newer]; we append on the right
 
-    def parse_rider_payload(payload: str):
+    def parse_triplet(payload: str):
         parts = payload.split('-')
         if len(parts) != 3:
             raise ValueError(f"Invalid rider data format: {payload!r}")
-        return parts[0].strip(), parts[1].strip(), parts[2].strip()  # bike, name, lap
+        return parts[0].strip(), parts[1].strip(), parts[2].strip()  # (bike, name, lap)
+
+    # Best-effort to get matrix dims if your driver exposes them; else fall back.
+    try:
+        width = getattr(matrix, 'width', None) or 64
+        height = getattr(matrix, 'height', None) or 16
+    except Exception:
+        width, height = 64, 16
+
+    def pick_layout(w, h):
+        if FORCE_LAYOUT == 'wide16x64':
+            return 'wide'
+        if FORCE_LAYOUT == 'tall32x32':
+            return 'tall'
+        # Auto-detect
+        if h == 16 and w >= 64:
+            return 'wide'
+        if w == 32 and h >= 32:
+            return 'tall'
+        # Fallback: prefer wide if it's a single 16-pixel-tall strip
+        return 'wide' if h <= 16 else 'tall'
+
+    layout = pick_layout(width, height)
 
     while not stop_event.is_set() and get_current_effect() == 'times':
         matrix.reset(matrix.color('black'))
 
-        # Ingest new data (if any)
-        new_triplet = None
+        # Ingest new data if present
         if isinstance(rider_data, str) and rider_data:
             try:
-                new_triplet = parse_rider_payload(rider_data)
-                # Push only if different from last entry to build a proper "previous"
-                if not history or history[-1] != new_triplet:
-                    history.append(new_triplet)
+                triplet = parse_triplet(rider_data)
+                if not history or history[-1] != triplet:
+                    history.append(triplet)
             except Exception as e:
-                print(f"[times] Invalid rider_data={rider_data!r}: {e}")
+                print(f"[times] Ignoring invalid rider_data={rider_data!r}: {e}")
 
         if not history:
-            print("[times] No rider data received, skipping...")
+            print("[times] No rider data; skipping frame.")
             matrix.delay(200)
             continue
 
-        # Prepare canvas (32 wide x 32 high since you stacked two 16px displays)
-        width, height = 32, 32
+        # Current = most recent; Previous = second most recent or fallback to current.
+        current = history[-1]
+        previous = history[-2] if len(history) >= 2 else current
+
+        # Build offscreen image for the full canvas we think we have
+        from PIL import Image, ImageDraw, ImageFont
+        image = Image.new("RGB", (width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(image)
         font = ImageFont.load_default()
 
-        # Measure line height and add vertical spacing
+        # Measure font line height; place time immediately below name (no extra gap)
         try:
             bbox = font.getbbox("Hg")
             LINE_H = bbox[3] - bbox[1]
         except Exception:
-            LINE_H = 8
-        LINE_GAP = 2  # vertical spacing between lines
+            LINE_H = 8  # default font height ~8px
+        LINE_GAP = 0  # <- exactly zero as requested
 
-        # Row anchors
-        top_row_y = 0
-        bottom_row_y = 16
+        def draw_block(x, y, triplet, dim=False):
+            bike, name, lap = triplet
+            name_color = get_bike_color(bike)
+            time_color = (180, 180, 180) if dim else (255, 255, 255)
+            # Name
+            draw.text((x, y), name, font=font, fill=name_color)
+            # Time immediately below name; no extra spacing
+            draw.text((x, y + LINE_H + LINE_GAP), lap, font=font, fill=time_color)
 
-        # Current = most recent; Previous = second most recent (or fallback to current)
-        current_display = history[-1]
-        previous_display = history[-2] if len(history) >= 2 else current_display
+        if layout == 'wide':
+            # Full canvas assumed 16 high, 64 wide (or similar wide strip)
+            # Left pane 0..31: current; Right pane 32..63: previous
+            pane_w = width // 2  # expect 32
+            # Clamp to avoid text spilling if non-64 widths
+            pane_w = max(16, min(pane_w, 64))
+            left_x, right_x = 0, pane_w
+            top_y = 0  # 16-px tall
+            draw_block(left_x, 0, current, dim=False)
+            draw_block(right_x, 0, previous, dim=True)
+        else:
+            # Tall 32x32: current top half (0..15), previous bottom half (16..31)
+            draw_block(0, 0, current, dim=False)
+            draw_block(0, 16, previous, dim=True)
 
-        # Build offscreen image
-        image = Image.new("RGB", (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(image)
-
-        # ----- draw current (top two lines) -----
-        bike, name, lap = current_display
-        bike_color = get_bike_color(bike)
-
-        # Name (top line) with spacing; then time (second line)
-        draw.text((0, top_row_y), name, font=font, fill=bike_color)
-        draw.text((0, top_row_y + LINE_H + LINE_GAP), lap, font=font, fill=(255, 255, 255))
-
-        # ----- draw previous (bottom two lines) -----
-        p_bike, p_name, p_lap = previous_display
-        p_color = get_bike_color(p_bike)
-
-        # Slightly dimmer to distinguish
-        DIM_WHITE = (180, 180, 180)
-        draw.text((0, bottom_row_y), p_name, font=font, fill=p_color)
-        draw.text((0, bottom_row_y + LINE_H + LINE_GAP), p_lap, font=font, fill=DIM_WHITE)
-
-        # Push pixels
+        # Push pixels to the matrix
         for x in range(width):
             for y in range(height):
                 matrix.pixel((x, y), image.getpixel((x, y)))
