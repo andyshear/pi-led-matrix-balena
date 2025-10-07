@@ -421,7 +421,7 @@ def effect_times(_initial_rider_data_ignored):
     cur_scroll = 0
     prev_scroll = 0
     SCROLL_PX_PER_FRAME = 1
-    IDLE_SLEEP_MS = 30
+    IDLE_SLEEP_MS = 20
 
     # caches: split into top (scrolling) and bottom (static) per pane
     cur_key = prev_key = None
