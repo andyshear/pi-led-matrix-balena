@@ -430,22 +430,22 @@ def effect_times(rider_data):
 
         # Row anchors
         top_row_y = 0               # current
-        bottom_row_y = 16           # previous (second display)
+        bottom_row_x = 32           # previous (second display)
 
         # ------ draw current (top two lines) ------
         bike_name, rider_name, lap_time = current_display
         bike_color = get_bike_color(bike_name)
 
-        draw.text((0, top_row_y - 1), rider_name, font=font, fill=bike_color)
-        draw.text((0, top_row_y - 1 + line_h), lap_time, font=font, fill=(255, 255, 255))
+        draw.text((0, top_row_y - 2), rider_name, font=font, fill=bike_color)
+        draw.text((0, top_row_y - 2 + line_h), lap_time, font=font, fill=(255, 255, 255))
 
         # ------ draw previous (bottom two lines), if any ------
         if previous_display is not None:
             p_bike, p_name, p_time = previous_display
             p_color = get_bike_color(p_bike)
 
-            draw.text((bottom_row_y, top_row_y - 1), p_name, font=font, fill=p_color)
-            draw.text((bottom_row_y, top_row_y - 1 + line_h), p_time, font=font, fill=(180, 180, 180))
+            draw.text((bottom_row_x, top_row_y - 2), p_name, font=font, fill=p_color)
+            draw.text((bottom_row_x, top_row_y - 2 + line_h), p_time, font=font, fill=(180, 180, 180))
             # ^ slightly dimmer white to distinguish from current
 
         # Push pixels to the matrix
