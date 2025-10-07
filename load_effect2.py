@@ -375,60 +375,87 @@ def effect_lastLapAnimation():
 
 # Adjust the code to make sure the rider's name and time are placed closer together
 def effect_times(rider_data):
-    """Display rider name and last lap time on the 32x16 matrix."""
-    last_valid_rider_data = None  # Store last valid rider data
+    """Display current rider (name + last lap) on rows 0–15 and the previous
+    valid rider on rows 16–31 of a 32x16 x2 stacked matrix (total 32 high)."""
+    previous_display = None  # (bike_name, rider_name, time)
+    current_display = None
+
+    # Utility: parse "bike-name-rider-#-time" triplet
+    def parse_rider_payload(payload: str):
+        parts = payload.split('-')
+        if len(parts) != 3:
+            raise ValueError(f"Invalid rider data format: {payload!r}")
+        bike_name = parts[0].strip()
+        rider_name = parts[1].strip()
+        lap_time  = parts[2].strip()
+        return bike_name, rider_name, lap_time
+
     while not stop_event.is_set() and get_current_effect() == 'times':
         matrix.reset(matrix.color('black'))
-        if rider_data is None or len(rider_data) == 0:
-            print("No rider data received, skipping...")
-            continue  # Skip if no data
 
-        # Define matrix size
-        width, height = 32, 16
-        font = ImageFont.load_default()  # Load default font (you can adjust this later for a smaller font)
-        image = Image.new("RGB", (width, height), (0, 0, 0))  # Create blank image
+        # If no new data came in, we still draw whatever we have cached
+        new_display = None
+        if rider_data and isinstance(rider_data, str) and len(rider_data) > 0:
+            try:
+                new_display = parse_rider_payload(rider_data)
+            except Exception as e:
+                print(f"[times] Skip invalid rider_data={rider_data!r}: {e}")
+
+        # Shift current -> previous if we parsed a new valid payload
+        if new_display:
+            if current_display is not None:
+                previous_display = current_display
+            current_display = new_display
+
+        # If we still have no current display, nothing useful to show
+        if current_display is None:
+            print("[times] No rider data received, skipping...")
+            matrix.delay(200)
+            continue
+
+        # Matrix canvas (now 32px tall, 32px wide)
+        width, height = 32, 32
+
+        # Build an offscreen image and draw both rows (each row is 2 text lines)
+        font = ImageFont.load_default()
+        image = Image.new("RGB", (width, height), (0, 0, 0))
         draw = ImageDraw.Draw(image)
-        
-        y_offset = 0
-        # print(f"Processing rider_data: {rider_data}")
 
+        # Compute text line height (default font ~8px)
         try:
-            rider_parts = rider_data.split('-')
-            if len(rider_parts) != 3:
-                print(f"Invalid rider data format for: {rider_data}. Skipping...")
-                continue  # Skip if format is wrong
+            bbox = font.getbbox("Hg")
+            line_h = bbox[3] - bbox[1]
+        except Exception:
+            line_h = 8  # Safe fallback
 
-            bike_name = rider_parts[0]  # e.g., kawasaki
-            rider_name = rider_parts[1]  # e.g., #513
-            time = rider_parts[2]  # e.g., 1:12:02
+        # Row anchors
+        top_row_y = 0               # current
+        bottom_row_y = 16           # previous (second display)
 
-            # Only show rider name and time, with bike color
-            # print(f"Bike: {bike_name}, Name: {rider_name}, Time: {time}")
+        # ------ draw current (top two lines) ------
+        bike_name, rider_name, lap_time = current_display
+        bike_color = get_bike_color(bike_name)
 
-            # Get the bike color for the rider's name
-            bike_color = get_bike_color(bike_name)
-            # print(f"y_offsetNAME: {y_offset-2}")
-            # Draw the first line (rider's name)
-            draw.text((0, y_offset-2), rider_name, font=font, fill=bike_color)
-            y_offset += FONT_SIZE  # Move down for next line (make sure this doesn't overlap)
-            # print(f"y_offsetTEXT: {y_offset-2}")
-            # Draw the second line (time)
-            draw.text((0, y_offset-2), time, font=font, fill=(255, 255, 255))  # White for time
-            y_offset += FONT_SIZE  # Move down for next line
+        draw.text((0, top_row_y - 1), rider_name, font=font, fill=bike_color)
+        draw.text((0, top_row_y - 1 + line_h), lap_time, font=font, fill=(255, 255, 255))
 
-        except Exception as e:
-            print(f"Error processing rider data: {rider_data}. Error: {str(e)}")
-            continue  # Skip invalid entries
+        # ------ draw previous (bottom two lines), if any ------
+        if previous_display is not None:
+            p_bike, p_name, p_time = previous_display
+            p_color = get_bike_color(p_bike)
 
-        # Convert image to LED matrix-compatible format
+            draw.text((0, bottom_row_y - 1), p_name, font=font, fill=p_color)
+            draw.text((0, bottom_row_y - 1 + line_h), p_time, font=font, fill=(180, 180, 180))
+            # ^ slightly dimmer white to distinguish from current
+
+        # Push pixels to the matrix
         for x in range(width):
             for y in range(height):
-                pixel_color = image.getpixel((x, y))
-                matrix.pixel((x, y), pixel_color)
+                matrix.pixel((x, y), image.getpixel((x, y)))
 
         matrix.delay(200)
-        matrix.show()  # Display the image on the matrix
-        matrix.delay(FLASH_DELAY)  # Delay to control the flashing
+        matrix.show()
+        matrix.delay(FLASH_DELAY)
         
 def effect_startGateCountdown():
     """Display '30', then '5', then flash green 3 times, then turn off."""
