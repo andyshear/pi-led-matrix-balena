@@ -21,6 +21,15 @@ MESSAGE = "CAUTION"
 FONT_SIZE = 8  # Adjust as needed
 FONT_PATH = "path/to/font.ttf"  # Adjust the font path as necessary
 
+# ------- CONFIG: match this to your physical chain --------
+PANEL_W, PANEL_H = 16, 16
+PANELS_X, PANELS_Y = 4, 1           # 4 panels in a row (1-wire easiest) => 16x64 virtual
+VIRTUAL_LAYOUT = 'wide16x64'        # 'wide16x64' (left=current, right=previous) or 'tall32x32'
+SERPENTINE_PER_ROW = True           # WS2812 panels are often serpentine-wired internally
+PANEL_CHAIN_ORDER = 'row-major'     # 'row-major' or 'col-major' for panel tiling
+# IMPORTANT: ensure your strip is sized for **all LEDs**
+# total_leds = PANEL_W * PANEL_H * PANELS_X * PANELS_Y  # should be 1024 for 4x 16x16
+
 def set_current_effect(effect):
     global current_effect
     with effect_change_lock:
@@ -377,108 +386,124 @@ def effect_lastLapAnimation():
         matrix.delay(1000)
 
 # Adjust the code to make sure the rider's name and time are placed closer together
+def _xy_to_index(x, y):
+    """
+    Map virtual (x,y) to linear LED index for a grid of WS2812 16x16 panels,
+    chained left-to-right then next row (row-major).
+    Adjust SERPENTINE_PER_ROW and PANEL_CHAIN_ORDER to your physical order.
+    """
+    # Which panel tile
+    tile_x = x // PANEL_W
+    tile_y = y // PANEL_H
+
+    # Local coords within a panel
+    lx = x % PANEL_W
+    ly = y % PANEL_H
+
+    # Index of panel in the chain (panel_number)
+    if PANEL_CHAIN_ORDER == 'row-major':
+        panel_idx = tile_y * PANELS_X + tile_x
+    else:  # 'col-major'
+        panel_idx = tile_x * PANELS_Y + tile_y
+
+    # Within each 16x16 panel, many are serpentine by row
+    if SERPENTINE_PER_ROW and (ly % 2 == 1):
+        # odd row: reversed
+        li = ly * PANEL_W + (PANEL_W - 1 - lx)
+    else:
+        li = ly * PANEL_W + lx
+
+    # Global index = panel offset + local index
+    leds_per_panel = PANEL_W * PANEL_H
+    return panel_idx * leds_per_panel + li
+
+def _put_pixel(matrix, x, y, color):
+    """Write a pixel using either (x,y) API or linear-index API."""
+    if hasattr(matrix, 'pixel'):
+        matrix.pixel((x, y), color)
+    elif hasattr(matrix, 'set_pixel'):
+        idx = _xy_to_index(x, y)
+        matrix.set_pixel(idx, color)
+    else:
+        # Fallback: assume linear is required
+        idx = _xy_to_index(x, y)
+        matrix[idx] = color  # e.g., neopixel-like
+
 def effect_times(rider_data):
     """
-    Shows the most recent rider and lap, plus the previous one.
-    - If matrix is 16x64 (wide): current = left 32x16, previous = right 32x16.
-    - If matrix is 32x32 (tall): current = top 16px (2 lines), previous = bottom 16px (2 lines).
-    Vertical spacing between name and time is exactly 0 pixels.
+    One-wire WS2812 chain, virtual canvas = 16x64 (default).
+    Left 32x16 shows current; right 32x16 shows previous.
+    Zero vertical gap between name/time lines.
     """
-    history = deque(maxlen=2)  # [older, newer]; we append on the right
+    history = deque(maxlen=2)
 
     def parse_triplet(payload: str):
         parts = payload.split('-')
         if len(parts) != 3:
             raise ValueError(f"Invalid rider data format: {payload!r}")
-        return parts[0].strip(), parts[1].strip(), parts[2].strip()  # (bike, name, lap)
+        return parts[0].strip(), parts[1].strip(), parts[2].strip()
 
-    # Best-effort to get matrix dims if your driver exposes them; else fall back.
-    try:
-        width = getattr(matrix, 'width', None) or 64
-        height = getattr(matrix, 'height', None) or 16
-    except Exception:
-        width, height = 64, 16
+    # Virtual canvas dims from panel config
+    width  = PANEL_W * PANELS_X
+    height = PANEL_H * PANELS_Y
 
-    def pick_layout(w, h):
-        if FORCE_LAYOUT == 'wide16x64':
-            return 'wide'
-        if FORCE_LAYOUT == 'tall32x32':
-            return 'tall'
-        # Auto-detect
-        if h == 16 and w >= 64:
-            return 'wide'
-        if w == 32 and h >= 32:
-            return 'tall'
-        # Fallback: prefer wide if it's a single 16-pixel-tall strip
-        return 'wide' if h <= 16 else 'tall'
-
-    layout = pick_layout(width, height)
+    # Choose wide (16x64) vs tall (32x32) behavior
+    layout = VIRTUAL_LAYOUT
 
     while not stop_event.is_set() and get_current_effect() == 'times':
         matrix.reset(matrix.color('black'))
 
-        # Ingest new data if present
+        # Ingest new payload (ignore duplicates so "previous" stays meaningful)
         if isinstance(rider_data, str) and rider_data:
             try:
                 triplet = parse_triplet(rider_data)
                 if not history or history[-1] != triplet:
                     history.append(triplet)
             except Exception as e:
-                print(f"[times] Ignoring invalid rider_data={rider_data!r}: {e}")
+                print(f"[times] invalid data: {rider_data!r}: {e}")
 
         if not history:
-            print("[times] No rider data; skipping frame.")
-            matrix.delay(200)
+            matrix.delay(100)
             continue
 
-        # Current = most recent; Previous = second most recent or fallback to current.
         current = history[-1]
-        previous = history[-2] if len(history) >= 2 else current
+        previous = history[-2] if len(history) >= 2 else history[-1]
 
-        # Build offscreen image for the full canvas we think we have
-        from PIL import Image, ImageDraw, ImageFont
+        # Render to offscreen image
         image = Image.new("RGB", (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(image)
-        font = ImageFont.load_default()
+        draw  = ImageDraw.Draw(image)
+        font  = ImageFont.load_default()
 
-        # Measure font line height; place time immediately below name (no extra gap)
         try:
             bbox = font.getbbox("Hg")
             LINE_H = bbox[3] - bbox[1]
         except Exception:
-            LINE_H = 8  # default font height ~8px
-        LINE_GAP = 0  # <- exactly zero as requested
+            LINE_H = 8
+        LINE_GAP = 0  # exact 0 as requested
 
         def draw_block(x, y, triplet, dim=False):
             bike, name, lap = triplet
             name_color = get_bike_color(bike)
             time_color = (180, 180, 180) if dim else (255, 255, 255)
-            # Name
             draw.text((x, y), name, font=font, fill=name_color)
-            # Time immediately below name; no extra spacing
             draw.text((x, y + LINE_H + LINE_GAP), lap, font=font, fill=time_color)
 
-        if layout == 'wide':
-            # Full canvas assumed 16 high, 64 wide (or similar wide strip)
-            # Left pane 0..31: current; Right pane 32..63: previous
-            pane_w = width // 2  # expect 32
-            # Clamp to avoid text spilling if non-64 widths
-            pane_w = max(16, min(pane_w, 64))
-            left_x, right_x = 0, pane_w
-            top_y = 0  # 16-px tall
-            draw_block(left_x, 0, current, dim=False)
-            draw_block(right_x, 0, previous, dim=True)
+        if layout == 'wide16x64':
+            # expect width >= 64 and height == 16 for 4x1 of 16x16
+            # left 32×16 = current, right 32×16 = previous
+            pane_w = min(32, width // 2)
+            draw_block(0, 0, current, dim=False)
+            draw_block(pane_w, 0, previous, dim=True)
         else:
-            # Tall 32x32: current top half (0..15), previous bottom half (16..31)
+            # 32x32 top/bottom
             draw_block(0, 0, current, dim=False)
             draw_block(0, 16, previous, dim=True)
 
-        # Push pixels to the matrix
+        # Push to LEDs using our XY→index mapper
         for x in range(width):
             for y in range(height):
-                matrix.pixel((x, y), image.getpixel((x, y)))
+                _put_pixel(matrix, x, y, image.getpixel((x, y)))
 
-        matrix.delay(200)
         matrix.show()
         matrix.delay(FLASH_DELAY)
         
