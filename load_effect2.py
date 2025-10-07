@@ -527,7 +527,8 @@ def effect_times(_initial_rider_data_ignored):
 
         if cur_bot_surface is not None:
             # overlay bottom line (static) on left pane
-            frame.alpha_composite(cur_bot_surface, dest=(0, 0)) if hasattr(frame, 'alpha_composite') else frame.paste(cur_bot_surface, (0, 0))
+            # frame.alpha_composite(cur_bot_surface, dest=(0, 0)) if hasattr(frame, 'alpha_composite') else frame.paste(cur_bot_surface, (0, 0))
+            frame.paste(cur_bot_surface, (0, 0))
 
         # RIGHT PANE (previous): paste scrolling top + static bottom
         if prev_top_surface is not None:
@@ -543,8 +544,8 @@ def effect_times(_initial_rider_data_ignored):
 
         if prev_bot_surface is not None:
             # overlay bottom line (static) on right pane
-            frame.alpha_composite(prev_bot_surface, dest=(pane_w, 0)) if hasattr(frame, 'alpha_composite') else frame.paste(prev_bot_surface, (pane_w, 0))
-
+            # frame.alpha_composite(prev_bot_surface, dest=(pane_w, 0)) if hasattr(frame, 'alpha_composite') else frame.paste(prev_bot_surface, (pane_w, 0))
+            frame.paste(prev_bot_surface, (pane_w, 0))
         # push pixels
         for x in range(width):
             for y in range(height):
