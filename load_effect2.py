@@ -414,7 +414,7 @@ def effect_times(rider_data):
             continue
 
         # Matrix canvas (now 32px tall, 32px wide)
-        width, height = 32, 32
+        width, height = 64, 16
 
         # Build an offscreen image and draw both rows (each row is 2 text lines)
         font = ImageFont.load_default()
@@ -444,8 +444,8 @@ def effect_times(rider_data):
             p_bike, p_name, p_time = previous_display
             p_color = get_bike_color(p_bike)
 
-            draw.text((0, bottom_row_y - 1), p_name, font=font, fill=p_color)
-            draw.text((0, bottom_row_y - 1 + line_h), p_time, font=font, fill=(180, 180, 180))
+            draw.text((bottom_row_y, top_row_y - 1), p_name, font=font, fill=p_color)
+            draw.text((bottom_row_y, top_row_y - 1 + line_h), p_time, font=font, fill=(180, 180, 180))
             # ^ slightly dimmer white to distinguish from current
 
         # Push pixels to the matrix
