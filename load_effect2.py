@@ -6,9 +6,11 @@ from PIL import Image, ImageDraw, ImageFont
 from collections import deque
 import queue
 
-# persistent across effect_times restarts
-times_history = deque(maxlen=2)   # [(bike, name, lap), ...]
-times_queue = queue.Queue()       # push new rider payloads here
+times_history = deque(maxlen=2)     # [(bike, name, time)]
+times_queue = queue.Queue()         # push rider payloads here
+
+laps_by_rider = {}                  # rider_name -> lap count
+_last_time_by_rider = {}            # rider_name -> last seen time (to avoid double-increment)
 
 # Initialize global variables for effect control
 current_effect = None
@@ -382,26 +384,86 @@ def effect_lastLapAnimation():
 # Adjust the code to make sure the rider's name and time are placed closer together
 def effect_times(_initial_rider_data_ignored):
     """
-    64x16 layout: current (left 32x16), previous (right 32x16).
-    Uses a global queue (times_queue) and a persistent history (times_history)
-    so previous doesn't get wiped between effect switches or new updates.
+    64x16 layout: left 32x16 = current, right 32x16 = previous.
+    Uses laps passed from Node (payload = bike-rider-laps-lapTime).
+    Per-pane marquee with zero vertical gap.
     """
-    # helper
-    def parse_triplet(payload: str):
+    # ---- helpers ----
+    def parse_quad(payload: str):
         parts = payload.split('-')
-        if len(parts) != 3:
-            raise ValueError(f"Invalid rider data format: {payload!r}")
-        return parts[0].strip(), parts[1].strip(), parts[2].strip()  # (bike, name, lap)
+        if len(parts) != 4:
+            raise ValueError(f"Invalid rider data format: {payload!r} (expected 4 fields)")
+        bike = parts[0].strip()
+        name = parts[1].strip()
+        laps_str = parts[2].strip()
+        lap_time = parts[3].strip()
+        return bike, name, laps_str, lap_time
 
-    # prep canvas
+    def record_seen(name: str, lap_time: str, laps_str: str):
+        """Trust laps from Node; store normalized int. Keep last time for optional logic."""
+        try:
+            laps_val = int(str(laps_str).strip())
+        except Exception:
+            laps_val = laps_by_rider.get(name, 0)
+        laps_by_rider[name] = laps_val
+        _last_time_by_rider[name] = lap_time
+
     width, height = 64, 16
+    pane_w = 32
+
     font = ImageFont.load_default()
     line_h = 8
     LINE_GAP = 0  # exactly zero
 
-    # Non-blocking consume loop
+    # per-pane scroll state
+    cur_scroll = 0
+    prev_scroll = 0
+    SCROLL_PX_PER_FRAME = 1
+    IDLE_SLEEP_MS = 30
+
+    # cached rendered strips
+    cur_surface = None
+    prev_surface = None
+    cur_key = None
+    prev_key = None
+
+    def make_surface(entry, dim: bool):
+        """
+        entry = (bike, name, laps_str, lap_time)
+        Returns a PIL surface W×16 (W >= 32) containing:
+          line 1: "name L{laps}"
+          line 2: lap_time
+        """
+        bike, name, laps_str, lap_time = entry
+        # trust provided laps; fallback to stored if parse fails
+        try:
+            laps_val = int(laps_str)
+        except Exception:
+            laps_val = laps_by_rider.get(name, 0)
+        top_text = f"{name} L{laps_val}"
+
+        # measure required width
+        dimg = Image.new("RGB", (1, 1), (0, 0, 0))
+        ddraw = ImageDraw.Draw(dimg)
+        w1 = ddraw.textbbox((0,0), top_text, font=font)[2]
+        w2 = ddraw.textbbox((0,0), lap_time, font=font)[2]
+        surf_w = max(pane_w, w1, w2) + 2  # tiny buffer
+
+        surf = Image.new("RGB", (surf_w, height), (0, 0, 0))
+        d = ImageDraw.Draw(surf)
+
+        name_color = get_bike_color(bike)
+        time_color = (180, 180, 180) if dim else (255, 255, 255)
+
+        y0 = -2
+        y1 = y0 + line_h + LINE_GAP
+
+        d.text((0,  y0), top_text, font=font, fill=name_color)
+        d.text((-1, y1), lap_time,  font=font, fill=time_color)
+        return surf, surf_w
+
     while not stop_event.is_set() and get_current_effect() == 'times':
-        # drain any new messages quickly
+        # ---- drain queue (non-blocking) ----
         updated = False
         while True:
             try:
@@ -409,47 +471,79 @@ def effect_times(_initial_rider_data_ignored):
             except queue.Empty:
                 break
             try:
-                triplet = parse_triplet(payload)
-                if not times_history or times_history[-1] != triplet:
-                    times_history.append(triplet)
+                quad = parse_quad(payload)  # (bike, name, laps_str, lap_time)
+                record_seen(quad[1], quad[3], quad[2])
+                if not times_history or times_history[-1] != quad:
+                    times_history.append(quad)
                 updated = True
             except Exception as e:
                 print(f"[times] Skip invalid rider_data={payload!r}: {e}")
 
         if not times_history:
-            # nothing to show yet; idle lightly
             matrix.reset(matrix.color('black'))
             matrix.show()
             matrix.delay(60)
             continue
 
-        # current = last; previous = second-last or fallback to current
-        current = times_history[-1]
+        current  = times_history[-1]
         previous = times_history[-2] if len(times_history) >= 2 else current
 
-        # render to offscreen
-        image = Image.new("RGB", (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(image)
+        # keys include provided laps to invalidate caches when laps change
+        cur_laps = laps_by_rider.get(current[1], current[2])
+        prev_laps = laps_by_rider.get(previous[1], previous[2])
+        this_cur_key  = (current[0], current[1], str(cur_laps), current[3], False)
+        this_prev_key = (previous[0], previous[1], str(prev_laps), previous[3], True)
 
-        def draw_block(x, y, triplet, dim=False):
-            bike, name, lap = triplet
-            name_color = get_bike_color(bike)
-            time_color = (180, 180, 180) if dim else (255, 255, 255)
-            draw.text((x, y - 2), name, font=font, fill=name_color)
-            draw.text((x - 1, y - 2 + line_h), lap, font=font, fill=time_color)
+        if this_cur_key != cur_key:
+            # normalize entry to use the latest known laps value
+            cur_entry = (current[0], current[1], str(cur_laps), current[3])
+            cur_surface, cur_w = make_surface(cur_entry, dim=False)
+            cur_key = this_cur_key
+            cur_scroll = 0 if cur_w <= pane_w else cur_scroll % cur_w
 
-        # left = current, right = previous
-        draw_block(0, 0, current, dim=False)
-        draw_block(32, 0, previous, dim=True)
+        if this_prev_key != prev_key:
+            prev_entry = (previous[0], previous[1], str(prev_laps), previous[3])
+            prev_surface, prev_w = make_surface(prev_entry, dim=True)
+            prev_key = this_prev_key
+            prev_scroll = 0 if prev_w <= pane_w else prev_scroll % prev_w
+
+        # compose final frame
+        frame = Image.new("RGB", (width, height), (0, 0, 0))
+
+        # left pane = current
+        if cur_surface is not None:
+            cur_w = cur_surface.size[0]
+            if cur_w <= pane_w:
+                frame.paste(cur_surface.crop((0,0,pane_w,height)), (0,0))
+            else:
+                x0 = cur_scroll % cur_w
+                w1 = min(pane_w, cur_w - x0)
+                frame.paste(cur_surface.crop((x0, 0, x0 + w1, height)), (0, 0))
+                if w1 < pane_w:
+                    w2 = pane_w - w1
+                    frame.paste(cur_surface.crop((0, 0, w2, height)), (w1, 0))
+                cur_scroll = (cur_scroll + SCROLL_PX_PER_FRAME) % cur_w
+
+        # right pane = previous (dim)
+        if prev_surface is not None:
+            prev_w = prev_surface.size[0]
+            if prev_w <= pane_w:
+                frame.paste(prev_surface.crop((0,0,pane_w,height)), (pane_w,0))
+            else:
+                x0 = prev_scroll % prev_w
+                w1 = min(pane_w, prev_w - x0)
+                frame.paste(prev_surface.crop((x0, 0, x0 + w1, height)), (pane_w, 0))
+                if w1 < pane_w:
+                    w2 = pane_w - w1
+                    frame.paste(prev_surface.crop((0, 0, w2, height)), (pane_w + w1, 0))
+                prev_scroll = (prev_scroll + SCROLL_PX_PER_FRAME) % prev_w
 
         # push pixels
         for x in range(width):
             for y in range(height):
-                matrix.pixel((x, y), image.getpixel((x, y)))
+                matrix.pixel((x, y), frame.getpixel((x, y)))
         matrix.show()
-
-        # small, stable frame delay; don’t clear between frames
-        matrix.delay(50)
+        matrix.delay(IDLE_SLEEP_MS)
         
 def effect_startGateCountdown():
     """Display '30', then '5', then flash green 3 times, then turn off."""
