@@ -3,6 +3,12 @@ import json
 import threading
 from src.led_matrix import Matrix, pixel_height, pixel_width
 from PIL import Image, ImageDraw, ImageFont
+from collections import deque
+import queue
+
+# persistent across effect_times restarts
+times_history = deque(maxlen=2)   # [(bike, name, lap), ...]
+times_queue = queue.Queue()       # push new rider payloads here
 
 # Initialize global variables for effect control
 current_effect = None
@@ -374,88 +380,76 @@ def effect_lastLapAnimation():
         matrix.delay(1000)
 
 # Adjust the code to make sure the rider's name and time are placed closer together
-def effect_times(rider_data):
-    """Display current rider (name + last lap) on rows 0–15 and the previous
-    valid rider on rows 16–31 of a 32x16 x2 stacked matrix (total 32 high)."""
-    previous_display = None  # (bike_name, rider_name, time)
-    current_display = None
-
-    # Utility: parse "bike-name-rider-#-time" triplet
-    def parse_rider_payload(payload: str):
+def effect_times(_initial_rider_data_ignored):
+    """
+    64x16 layout: current (left 32x16), previous (right 32x16).
+    Uses a global queue (times_queue) and a persistent history (times_history)
+    so previous doesn't get wiped between effect switches or new updates.
+    """
+    # helper
+    def parse_triplet(payload: str):
         parts = payload.split('-')
         if len(parts) != 3:
             raise ValueError(f"Invalid rider data format: {payload!r}")
-        bike_name = parts[0].strip()
-        rider_name = parts[1].strip()
-        lap_time  = parts[2].strip()
-        return bike_name, rider_name, lap_time
+        return parts[0].strip(), parts[1].strip(), parts[2].strip()  # (bike, name, lap)
 
+    # prep canvas
+    width, height = 64, 16
+    font = ImageFont.load_default()
+    line_h = 8
+    LINE_GAP = 0  # exactly zero
+
+    # Non-blocking consume loop
     while not stop_event.is_set() and get_current_effect() == 'times':
-        matrix.reset(matrix.color('black'))
-
-        # If no new data came in, we still draw whatever we have cached
-        new_display = None
-        if rider_data and isinstance(rider_data, str) and len(rider_data) > 0:
+        # drain any new messages quickly
+        updated = False
+        while True:
             try:
-                new_display = parse_rider_payload(rider_data)
+                payload = times_queue.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                triplet = parse_triplet(payload)
+                if not times_history or times_history[-1] != triplet:
+                    times_history.append(triplet)
+                updated = True
             except Exception as e:
-                print(f"[times] Skip invalid rider_data={rider_data!r}: {e}")
+                print(f"[times] Skip invalid rider_data={payload!r}: {e}")
 
-        # Shift current -> previous if we parsed a new valid payload
-        if new_display:
-            if current_display is not None:
-                previous_display = current_display
-            current_display = new_display
-
-        # If we still have no current display, nothing useful to show
-        if current_display is None:
-            print("[times] No rider data received, skipping...")
-            matrix.delay(200)
+        if not times_history:
+            # nothing to show yet; idle lightly
+            matrix.reset(matrix.color('black'))
+            matrix.show()
+            matrix.delay(60)
             continue
 
-        # Matrix canvas (now 32px tall, 32px wide)
-        width, height = 64, 16
+        # current = last; previous = second-last or fallback to current
+        current = times_history[-1]
+        previous = times_history[-2] if len(times_history) >= 2 else current
 
-        # Build an offscreen image and draw both rows (each row is 2 text lines)
-        font = ImageFont.load_default()
+        # render to offscreen
         image = Image.new("RGB", (width, height), (0, 0, 0))
         draw = ImageDraw.Draw(image)
 
-        # Compute text line height (default font ~8px)
-        # try:
-        #     bbox = font.getbbox("Hg")
-        #     line_h = bbox[3] - bbox[1]
-        # except Exception:
-        line_h = 8  # Safe fallback
+        def draw_block(x, y, triplet, dim=False):
+            bike, name, lap = triplet
+            name_color = get_bike_color(bike)
+            time_color = (180, 180, 180) if dim else (255, 255, 255)
+            draw.text((x, y - 2), name, font=font, fill=name_color)
+            draw.text((x - 1, y - 2 + line_h), lap, font=font, fill=time_color)
 
-        # Row anchors
-        top_row_y = 0               # current
-        bottom_row_x = 32           # previous (second display)
+        # left = current, right = previous
+        draw_block(0, 0, current, dim=False)
+        draw_block(32, 0, previous, dim=True)
 
-        # ------ draw current (top two lines) ------
-        bike_name, rider_name, lap_time = current_display
-        bike_color = get_bike_color(bike_name)
-
-        draw.text((0, top_row_y - 2), rider_name, font=font, fill=bike_color)
-        draw.text((-1, top_row_y - 2 + line_h), lap_time, font=font, fill=(255, 255, 255))
-
-        # ------ draw previous (bottom two lines), if any ------
-        if previous_display is not None:
-            p_bike, p_name, p_time = previous_display
-            p_color = get_bike_color(p_bike)
-
-            draw.text((bottom_row_x, top_row_y - 2), p_name, font=font, fill=p_color)
-            draw.text((bottom_row_x - 1, top_row_y - 2 + line_h), p_time, font=font, fill=(180, 180, 180))
-            # ^ slightly dimmer white to distinguish from current
-
-        # Push pixels to the matrix
+        # push pixels
         for x in range(width):
             for y in range(height):
                 matrix.pixel((x, y), image.getpixel((x, y)))
-
-        matrix.delay(200)
         matrix.show()
-        matrix.delay(FLASH_DELAY)
+
+        # small, stable frame delay; don’t clear between frames
+        matrix.delay(50)
         
 def effect_startGateCountdown():
     """Display '30', then '5', then flash green 3 times, then turn off."""
@@ -551,14 +545,25 @@ effects = {
 
 def apply_effect(effect_name, rider_data=None):
     global stop_event, current_effect_thread
-    if current_effect_thread is not None:
-        stop_event.set()  # Signal the current effect to stop
-        current_effect_thread.join()  # Wait for the current effect to acknowledge and stop
-        stop_event.clear()  # Reset for the next effect
+    # If the times effect is already running, just enqueue new data and don't restart
+    if effect_name == 'times' and get_current_effect() == 'times' and current_effect_thread is not None and current_effect_thread.is_alive():
+        if isinstance(rider_data, str) and rider_data:
+            times_queue.put(rider_data)
+        return
 
-    set_current_effect(effect_name)  # Update the current effect
+    # switching effects or starting fresh
+    if current_effect_thread is not None:
+        stop_event.set()
+        current_effect_thread.join()
+        stop_event.clear()
+
+    set_current_effect(effect_name)
     current_effect_thread = threading.Thread(target=effects[effect_name], args=(rider_data,))
     current_effect_thread.start()
+
+    # if launching times with an initial payload, enqueue it
+    if effect_name == 'times' and isinstance(rider_data, str) and rider_data:
+        times_queue.put(rider_data)
 
 def listen_for_commands():
     """Continuously listen for new commands and apply effects accordingly."""
