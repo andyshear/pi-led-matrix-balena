@@ -375,43 +375,87 @@ def effect_lastLapAnimation():
 
 # Adjust the code to make sure the rider's name and time are placed closer together
 def effect_times(rider_data):
-    """Red, yellow, repeat."""
-    while not stop_event.is_set() and get_current_effect() == 'caution':
-        matrix.reset(matrix.color('yellow'))
-        
-        # Define the size of the matrix
-        width = 16
-        height = 16
-        
-        # Draw 'X' by connecting opposite corners
-        for i in range(min(width, height)):
-            # Draw from top-left to bottom-right
-            matrix.pixel((i, i), (255, 0, 0))
-            matrix.pixel((i, i+1), (255, 0, 0))
-            # Draw from top-right to bottom-left
-            matrix.pixel((width - 1 - i, i), (255, 0, 0))
-            matrix.pixel((width - 1 - i+1, i), (255, 0, 0))
+    """Display current rider (name + last lap) on rows 0–15 and the previous
+    valid rider on rows 16–31 of a 32x16 x2 stacked matrix (total 32 high)."""
+    previous_display = None  # (bike_name, rider_name, time)
+    current_display = None
 
-        matrix.show()
-        matrix.delay(50)
-        matrix.reset()
-        
-        # Define the size of the matrix
-        width = 16
-        height = 16
-        
-        # Draw 'X' by connecting opposite corners
-        for i in range(min(width, height)):
-            # Draw from top-left to bottom-right
-            matrix.pixel((i, i), (255, 0, 0))
-            matrix.pixel((i, i+1), (255, 0, 0))
-            # Draw from top-right to bottom-left
-            matrix.pixel((width - 1 - i, i), (255, 0, 0))
-            matrix.pixel((width - 1 - i+1, i), (255, 0, 0))
+    # Utility: parse "bike-name-rider-#-time" triplet
+    def parse_rider_payload(payload: str):
+        parts = payload.split('-')
+        if len(parts) != 3:
+            raise ValueError(f"Invalid rider data format: {payload!r}")
+        bike_name = parts[0].strip()
+        rider_name = parts[1].strip()
+        lap_time  = parts[2].strip()
+        return bike_name, rider_name, lap_time
 
+    while not stop_event.is_set() and get_current_effect() == 'times':
+        matrix.reset(matrix.color('black'))
+
+        # If no new data came in, we still draw whatever we have cached
+        new_display = None
+        if rider_data and isinstance(rider_data, str) and len(rider_data) > 0:
+            try:
+                new_display = parse_rider_payload(rider_data)
+            except Exception as e:
+                print(f"[times] Skip invalid rider_data={rider_data!r}: {e}")
+
+        # Shift current -> previous if we parsed a new valid payload
+        if new_display:
+            if current_display is not None:
+                previous_display = current_display
+            current_display = new_display
+
+        # If we still have no current display, nothing useful to show
+        if current_display is None:
+            print("[times] No rider data received, skipping...")
+            matrix.delay(200)
+            continue
+
+        # Matrix canvas (now 32px tall, 32px wide)
+        width, height = 32, 32
+
+        # Build an offscreen image and draw both rows (each row is 2 text lines)
+        font = ImageFont.load_default()
+        image = Image.new("RGB", (width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(image)
+
+        # Compute text line height (default font ~8px)
+        try:
+            bbox = font.getbbox("Hg")
+            line_h = bbox[3] - bbox[1]
+        except Exception:
+            line_h = 8  # Safe fallback
+
+        # Row anchors
+        top_row_y = 0               # current
+        bottom_row_y = 16           # previous (second display)
+
+        # ------ draw current (top two lines) ------
+        bike_name, rider_name, lap_time = current_display
+        bike_color = get_bike_color(bike_name)
+
+        draw.text((0, top_row_y - 1), rider_name, font=font, fill=bike_color)
+        draw.text((0, top_row_y - 1 + line_h), lap_time, font=font, fill=(255, 255, 255))
+
+        # ------ draw previous (bottom two lines), if any ------
+        if previous_display is not None:
+            p_bike, p_name, p_time = previous_display
+            p_color = get_bike_color(p_bike)
+
+            draw.text((0, bottom_row_y - 1), p_name, font=font, fill=p_color)
+            draw.text((0, bottom_row_y - 1 + line_h), p_time, font=font, fill=(180, 180, 180))
+            # ^ slightly dimmer white to distinguish from current
+
+        # Push pixels to the matrix
+        for x in range(width):
+            for y in range(height):
+                matrix.pixel((x, y), image.getpixel((x, y)))
+
+        matrix.delay(200)
         matrix.show()
-        matrix.delay(50)
-    print("Exiting caution effect.")
+        matrix.delay(FLASH_DELAY)
         
 def effect_startGateCountdown():
     """Display '30', then '5', then flash green 3 times, then turn off."""
