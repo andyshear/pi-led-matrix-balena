@@ -499,6 +499,7 @@ def effect_times(rider_data, test_mode=True):
     Normal: current/previous rider on a 32x32 (2x2) WS2812 wall.
     Diagnostics: when test_mode=True or rider_data == "__TEST__", run panel tests, then resume normal.
     """
+    print("TESTING")
     # ---- DIAGNOSTIC MODE ----
     if test_mode or rider_data == "__TEST__":
         try:
