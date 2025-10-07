@@ -385,7 +385,7 @@ def effect_lastLapAnimation():
 def effect_times(_initial_rider_data_ignored):
     """
     64x16 layout: left 32x16 = current, right 32x16 = previous.
-    Top line (NAME L{laps}) scrolls horizontally; bottom line (lap time) is static.
+    Top line (NAME L{laps}) scrolls; bottom line (lap time) is static and drawn directly.
     Payload: bike-rider-laps-lapTime
     """
     # ---- helpers ----
@@ -393,8 +393,7 @@ def effect_times(_initial_rider_data_ignored):
         parts = [p.strip() for p in payload.split('-')]
         if len(parts) != 4:
             raise ValueError(f"Invalid rider data format: {payload!r} (expected 4 fields)")
-        bike, name, laps_str, lap_time = parts
-        return bike, name, laps_str, lap_time
+        return parts[0], parts[1], parts[2], parts[3]  # bike, name, laps_str, lap_time
 
     def record_seen(name: str, lap_time: str, laps_str: str):
         try:
@@ -406,60 +405,46 @@ def effect_times(_initial_rider_data_ignored):
 
     width, height = 64, 16
     pane_w = 32
-
     font = ImageFont.load_default()
     line_h = 8
     LINE_GAP = 0
     y0 = -2
     y1 = y0 + line_h + LINE_GAP
 
-    # per-pane scroll state (top line only)
+    # top-line scroll state only
     cur_scroll = 0
     prev_scroll = 0
-    SCROLL_PX_PER_FRAME = 2   # a tad faster; tweak if needed
+    SCROLL_PX_PER_FRAME = 2
     IDLE_SLEEP_MS = 20
 
-    # caches: split into top (scrolling) and bottom (static) per pane
+    # caches (top surfaces only)
     cur_key = prev_key = None
-    cur_top_surface = cur_bot_surface = None
-    prev_top_surface = prev_bot_surface = None
+    cur_top_surface = prev_top_surface = None
     cur_top_w = prev_top_w = pane_w
 
-    def make_surfaces(entry, dim: bool):
-        """
-        entry = (bike, name, laps_str, lap_time)
-        Returns:
-         - top_surface (W_top x 16) with ONLY the top line drawn (can be wider than pane)
-         - top_w (its width)
-         - bot_surface (pane_w x 16) with ONLY the bottom line drawn (fixed width)
-        """
+    def make_top_surface(entry, dim: bool):
+        """Return (top_surface, top_w, time_color) for an entry."""
         bike, name, laps_str, lap_time = entry
         try:
             laps_val = int(laps_str)
         except Exception:
             laps_val = laps_by_rider.get(name, 0)
-
         top_text = f"{name} L{laps_val}"
+
         name_color = get_bike_color(bike)
         time_color = (180, 180, 180) if dim else (255, 255, 255)
 
-        # measure widths
+        # measure width needed for top text
         tmp = Image.new("RGB", (1, 1))
         dd = ImageDraw.Draw(tmp)
         w_top = dd.textbbox((0, 0), top_text, font=font)[2]
-        top_w = max(pane_w, w_top) + 2  # top can scroll beyond pane
+        top_w = max(pane_w, w_top) + 2
 
-        # build top (scrolling) surface
-        top_surface = Image.new("RGB", (top_w, height), (0, 0, 0))
-        d_top = ImageDraw.Draw(top_surface)
-        d_top.text((0, y0), top_text, font=font, fill=name_color)
+        surf = Image.new("RGB", (top_w, height), (0, 0, 0))
+        d = ImageDraw.Draw(surf)
+        d.text((0, y0), top_text, font=font, fill=name_color)
 
-        # build bottom (static) surface exactly pane_w wide
-        bot_surface = Image.new("RGB", (pane_w, height), (0, 0, 0))
-        d_bot = ImageDraw.Draw(bot_surface)
-        d_bot.text((-1, y1), lap_time, font=font, fill=time_color)
-
-        return top_surface, top_w, bot_surface
+        return surf, top_w, time_color
 
     while not stop_event.is_set() and get_current_effect() == 'times':
         # drain queue
@@ -483,7 +468,6 @@ def effect_times(_initial_rider_data_ignored):
         current  = times_history[-1]
         previous = times_history[-2] if len(times_history) >= 2 else current
 
-        # keys include normalized laps + lap_time so we rebuild when they change
         cur_laps  = laps_by_rider.get(current[1],  current[2])
         prev_laps = laps_by_rider.get(previous[1], previous[2])
         this_cur_key  = ('cur',  current[0],  current[1],  str(cur_laps),  current[3])
@@ -491,20 +475,31 @@ def effect_times(_initial_rider_data_ignored):
 
         if this_cur_key != cur_key:
             cur_entry = (current[0], current[1], str(cur_laps), current[3])
-            cur_top_surface, cur_top_w, cur_bot_surface = make_surfaces(cur_entry, dim=False)
+            cur_top_surface, cur_top_w, cur_time_color = make_top_surface(cur_entry, dim=False)
             cur_key = this_cur_key
             cur_scroll = 0 if cur_top_w <= pane_w else cur_scroll % cur_top_w
+        else:
+            # preserve last computed color
+            try:
+                cur_time_color
+            except NameError:
+                cur_time_color = (255, 255, 255)
 
         if this_prev_key != prev_key:
             prev_entry = (previous[0], previous[1], str(prev_laps), previous[3])
-            prev_top_surface, prev_top_w, prev_bot_surface = make_surfaces(prev_entry, dim=True)
+            prev_top_surface, prev_top_w, prev_time_color = make_top_surface(prev_entry, dim=True)
             prev_key = this_prev_key
             prev_scroll = 0 if prev_top_w <= pane_w else prev_scroll % prev_top_w
+        else:
+            try:
+                prev_time_color
+            except NameError:
+                prev_time_color = (180, 180, 180)
 
         # compose final frame
         frame = Image.new("RGB", (width, height), (0, 0, 0))
 
-        # LEFT PANE (current)
+        # LEFT pane: paste top scroller
         if cur_top_surface is not None:
             if cur_top_w <= pane_w:
                 frame.paste(cur_top_surface.crop((0, 0, pane_w, height)), (0, 0))
@@ -516,10 +511,7 @@ def effect_times(_initial_rider_data_ignored):
                     frame.paste(cur_top_surface.crop((0, 0, pane_w - w1, height)), (w1, 0))
                 cur_scroll = (cur_scroll + SCROLL_PX_PER_FRAME) % cur_top_w
 
-        if cur_bot_surface is not None:
-            frame.paste(cur_bot_surface, (0, 0))  # static bottom line
-
-        # RIGHT PANE (previous)
+        # RIGHT pane: paste top scroller
         if prev_top_surface is not None:
             if prev_top_w <= pane_w:
                 frame.paste(prev_top_surface.crop((0, 0, pane_w, height)), (pane_w, 0))
@@ -531,8 +523,12 @@ def effect_times(_initial_rider_data_ignored):
                     frame.paste(prev_top_surface.crop((0, 0, pane_w - w1, height)), (pane_w + w1, 0))
                 prev_scroll = (prev_scroll + SCROLL_PX_PER_FRAME) % prev_top_w
 
-        if prev_bot_surface is not None:
-            frame.paste(prev_bot_surface, (pane_w, 0))  # static bottom line
+        # draw bottom (static) times directly onto frame so nothing covers the scroller
+        draw_frame = ImageDraw.Draw(frame)
+        # left pane time
+        draw_frame.text((-1, y1), current[3], font=font, fill=cur_time_color)
+        # right pane time
+        draw_frame.text((pane_w - 1, y1), previous[3], font=font, fill=prev_time_color)
 
         # push pixels
         for x in range(width):
