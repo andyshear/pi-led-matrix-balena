@@ -3,6 +3,7 @@ import json
 import threading
 from src.led_matrix import Matrix, pixel_height, pixel_width
 from PIL import Image, ImageDraw, ImageFont
+from collections import deque
 
 # Initialize global variables for effect control
 current_effect = None
@@ -375,80 +376,81 @@ def effect_lastLapAnimation():
 
 # Adjust the code to make sure the rider's name and time are placed closer together
 def effect_times(rider_data):
-    """Display current rider (name + last lap) on rows 0–15 and the previous
-    valid rider on rows 16–31 of a 32x16 x2 stacked matrix (total 32 high)."""
-    previous_display = None  # (bike_name, rider_name, time)
-    current_display = None
+    """
+    Display current rider (name + last lap) on rows 0–15 and the previous
+    valid rider on rows 16–31 of a 32x32 (w x h) stacked matrix.
+    Maintains vertical spacing and guarantees something on the bottom row.
+    """
+    # Keep the last two DISTINCT payloads
+    history = deque(maxlen=2)  # rightmost = most recent
 
-    # Utility: parse "bike-name-rider-#-time" triplet
     def parse_rider_payload(payload: str):
         parts = payload.split('-')
         if len(parts) != 3:
             raise ValueError(f"Invalid rider data format: {payload!r}")
-        bike_name = parts[0].strip()
-        rider_name = parts[1].strip()
-        lap_time  = parts[2].strip()
-        return bike_name, rider_name, lap_time
+        return parts[0].strip(), parts[1].strip(), parts[2].strip()  # bike, name, lap
 
     while not stop_event.is_set() and get_current_effect() == 'times':
         matrix.reset(matrix.color('black'))
 
-        # If no new data came in, we still draw whatever we have cached
-        new_display = None
-        if rider_data and isinstance(rider_data, str) and len(rider_data) > 0:
+        # Ingest new data (if any)
+        new_triplet = None
+        if isinstance(rider_data, str) and rider_data:
             try:
-                new_display = parse_rider_payload(rider_data)
+                new_triplet = parse_rider_payload(rider_data)
+                # Push only if different from last entry to build a proper "previous"
+                if not history or history[-1] != new_triplet:
+                    history.append(new_triplet)
             except Exception as e:
-                print(f"[times] Skip invalid rider_data={rider_data!r}: {e}")
+                print(f"[times] Invalid rider_data={rider_data!r}: {e}")
 
-        # Shift current -> previous if we parsed a new valid payload
-        if new_display:
-            if current_display is not None:
-                previous_display = current_display
-            current_display = new_display
-
-        # If we still have no current display, nothing useful to show
-        if current_display is None:
+        if not history:
             print("[times] No rider data received, skipping...")
             matrix.delay(200)
             continue
 
-        # Matrix canvas (now 32px tall, 32px wide)
+        # Prepare canvas (32 wide x 32 high since you stacked two 16px displays)
         width, height = 32, 32
-
-        # Build an offscreen image and draw both rows (each row is 2 text lines)
         font = ImageFont.load_default()
+
+        # Measure line height and add vertical spacing
+        try:
+            bbox = font.getbbox("Hg")
+            LINE_H = bbox[3] - bbox[1]
+        except Exception:
+            LINE_H = 8
+        LINE_GAP = 2  # vertical spacing between lines
+
+        # Row anchors
+        top_row_y = 0
+        bottom_row_y = 16
+
+        # Current = most recent; Previous = second most recent (or fallback to current)
+        current_display = history[-1]
+        previous_display = history[-2] if len(history) >= 2 else current_display
+
+        # Build offscreen image
         image = Image.new("RGB", (width, height), (0, 0, 0))
         draw = ImageDraw.Draw(image)
 
-        # Compute text line height (default font ~8px)
-        try:
-            bbox = font.getbbox("Hg")
-            line_h = bbox[3] - bbox[1]
-        except Exception:
-            line_h = 8  # Safe fallback
+        # ----- draw current (top two lines) -----
+        bike, name, lap = current_display
+        bike_color = get_bike_color(bike)
 
-        # Row anchors
-        top_row_y = 0               # current
-        bottom_row_y = 16           # previous (second display)
+        # Name (top line) with spacing; then time (second line)
+        draw.text((0, top_row_y), name, font=font, fill=bike_color)
+        draw.text((0, top_row_y + LINE_H + LINE_GAP), lap, font=font, fill=(255, 255, 255))
 
-        # ------ draw current (top two lines) ------
-        bike_name, rider_name, lap_time = current_display
-        bike_color = get_bike_color(bike_name)
+        # ----- draw previous (bottom two lines) -----
+        p_bike, p_name, p_lap = previous_display
+        p_color = get_bike_color(p_bike)
 
-        draw.text((0, top_row_y - 1), rider_name, font=font, fill=bike_color)
-        draw.text((0, top_row_y - 1 + line_h), lap_time, font=font, fill=(255, 255, 255))
+        # Slightly dimmer to distinguish
+        DIM_WHITE = (180, 180, 180)
+        draw.text((0, bottom_row_y), p_name, font=font, fill=p_color)
+        draw.text((0, bottom_row_y + LINE_H + LINE_GAP), p_lap, font=font, fill=DIM_WHITE)
 
-        # ------ draw previous (bottom two lines), if any ------
-        if previous_display is not None:
-            p_bike, p_name, p_time = previous_display
-            p_color = get_bike_color(p_bike)
-
-            draw.text((0, bottom_row_y - 1), p_name, font=font, fill=p_color)
-            draw.text((0, bottom_row_y - 1 + line_h), p_time, font=font, fill=(180, 180, 180))
-            # ^ slightly dimmer white to distinguish from current
-
-        # Push pixels to the matrix
+        # Push pixels
         for x in range(width):
             for y in range(height):
                 matrix.pixel((x, y), image.getpixel((x, y)))
