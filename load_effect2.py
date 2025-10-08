@@ -384,16 +384,11 @@ def effect_lastLapAnimation():
 # Adjust the code to make sure the rider's name and time are placed closer together
 def effect_times(_initial_rider_data_ignored):
     """
-    64x16 layout: two fixed 'lanes' (left=lane 0, right=lane 1).
-    Each rider is permanently assigned to a lane using a stable rule:
-      - If riderId has digits, use last digit % 2
-      - Otherwise use crc32(name) % 2
-    Incoming updates only modify that rider's lane; the other lane is untouched.
-    Top line (NAME/ID + L{laps}) scrolls, bottom line (lap time) is static.
-    Payload: bike-rider-laps-lapTime  (e.g., 'yamaha-#27-11-1:31:35')
+    Two fixed lanes; riders are 'sticky' to their lane.
+    New riders are assigned to the less-loaded lane; ties broken via stable hash.
+    Riders are pruned from lane load if idle > LANE_TTL_MS, so distribution stays fair.
     """
-    import re, zlib
-
+    import re, zlib, time
     # ---- helpers ----
     def parse_quad(payload: str):
         parts = [p.strip() for p in payload.split('-')]
@@ -401,51 +396,78 @@ def effect_times(_initial_rider_data_ignored):
             raise ValueError(f"Invalid rider data format: {payload!r} (expected 4 fields)")
         return parts[0], parts[1], parts[2], parts[3]  # bike, name, laps_str, lap_time
 
-    def lane_for(name: str) -> int:
-        """
-        Stable 0/1 lane assignment.
-        Prefer last digit in the riderId (e.g. '#513' -> 3 -> lane 1).
-        Fallback to crc32(name).
-        """
-        m = re.search(r'(\d)(?!.*\d)', name)
-        if m:
-            return int(m.group(1)) % 2
-        return (zlib.crc32(name.encode('utf-8')) & 1)
-
     def normalize_laps(name: str, laps_str: str) -> int:
         try:
             return int(str(laps_str))
         except Exception:
             return laps_by_rider.get(name, 0)
 
+    def stable_bit(name: str) -> int:
+        # deterministic 0/1 tie-breaker
+        return (zlib.crc32(name.encode('utf-8')) & 1)
+
+    # --- NEW: sticky, load-aware lane assignment state ---
+    LANE_TTL_MS = 120_000  # consider rider inactive after 2 min idle (tweak)
+    lane_assign = {}       # name -> lane (0 or 1)
+    last_seen_ms = {}      # name -> epoch ms last update
+    lane_members = [set(), set()]  # current active riders per lane
+
+    def prune_inactive(now_ms: int):
+        # Remove stale riders from lane_members (assignment remains sticky if they return)
+        for lane in (0, 1):
+            stale = [n for n in lane_members[lane] if (now_ms - last_seen_ms.get(n, 0)) > LANE_TTL_MS]
+            for n in stale:
+                lane_members[lane].discard(n)
+
+    def ensure_lane(name: str):
+        """
+        Ensure rider has a lane. If new or long idle: assign to less loaded lane.
+        Ties go to stable_bit(name). Keeps lane sticky across frequent reads.
+        """
+        now_ms = int(time.time() * 1000)
+        prune_inactive(now_ms)
+
+        if name in lane_assign:
+            # Refresh active membership for load tracking
+            lane = lane_assign[name]
+            lane_members[lane].add(name)
+            last_seen_ms[name] = now_ms
+            return lane
+
+        # Choose lighter lane
+        sizes = (len(lane_members[0]), len(lane_members[1]))
+        if sizes[0] < sizes[1]:
+            lane = 0
+        elif sizes[1] < sizes[0]:
+            lane = 1
+        else:
+            lane = stable_bit(name)  # deterministic tie-break
+
+        lane_assign[name] = lane
+        lane_members[lane].add(name)
+        last_seen_ms[name] = now_ms
+        return lane
+
     width, height = 64, 16
     pane_w = 32
     font = ImageFont.load_default()
     line_h = 8
     LINE_GAP = 0
-    y0 = -2                             # top text baseline
-    y1 = y0 + line_h + LINE_GAP         # bottom text baseline (static time)
+    y0 = -2
+    y1 = y0 + line_h + LINE_GAP
 
     SCROLL_PX_PER_FRAME = 2
     IDLE_SLEEP_MS = 20
 
     # Per-lane state
-    # lane_entries[lane] = (bike, name, laps_str, lap_time)
-    lane_entries = [None, None]
-
-    # Per-lane scroll + caches
+    lane_entries = [None, None]      # (bike, name, laps_str, lap_time)
     scroll = [0, 0]
     top_surface = [None, None]
     top_w = [pane_w, pane_w]
-    time_color = [(255, 255, 255), (180, 180, 180)]  # left bright, right dim by default
+    time_color = [(255, 255, 255), (180, 180, 180)]  # tweak if you want both bright
     last_key = [None, None]
 
     def make_top_surface(entry, dim: bool):
-        """
-        entry = (bike, name, laps_str, lap_time)
-        Returns (surface, surface_w, time_color)
-        Top text: "name L{laps}"
-        """
         bike, name, laps_str, lap_time = entry
         laps_val = normalize_laps(name, laps_str)
         top_text = f"{name} L{laps_val}"
@@ -453,7 +475,6 @@ def effect_times(_initial_rider_data_ignored):
         name_color = get_bike_color(bike)
         tcolor = (180, 180, 180) if dim else (255, 255, 255)
 
-        # measure width needed for top text
         tmp = Image.new("RGB", (1, 1))
         dd = ImageDraw.Draw(tmp)
         w_top = dd.textbbox((0, 0), top_text, font=font)[2]
@@ -464,58 +485,47 @@ def effect_times(_initial_rider_data_ignored):
         d.text((0, y0), top_text, font=font, fill=name_color)
         return surf, surf_w, tcolor
 
-    # Main loop
     while not stop_event.is_set() and get_current_effect() == 'times':
-        # ---- drain all queued updates; update only their lane ----
         updated_any = False
         while True:
             try:
                 payload = times_queue.get_nowait()
             except queue.Empty:
                 break
-
             try:
                 bike, name, laps_str, lap_time = parse_quad(payload)
-                # update memory of laps + last time
                 laps_by_rider[name] = normalize_laps(name, laps_str)
                 _last_time_by_rider[name] = lap_time
 
-                lane = lane_for(name)  # 0=left, 1=right
-                # set/replace that lane's current entry
+                lane = ensure_lane(name)           # <-- NEW: sticky, balanced lane
                 lane_entries[lane] = (bike, name, str(laps_by_rider[name]), lap_time)
                 updated_any = True
             except Exception as e:
                 print(f"[times] Skip invalid rider_data={payload!r}: {e}")
 
-        # If nothing to show yet, blank and wait
         if lane_entries[0] is None and lane_entries[1] is None:
-            matrix.reset(matrix.color('black'))
-            matrix.show()
-            matrix.delay(60)
+            matrix.reset(matrix.color('black')); matrix.show(); matrix.delay(60)
             continue
 
-        # For each lane, (re)build cache if the content changed
+        # Build caches per lane if changed
         for lane in (0, 1):
             entry = lane_entries[lane]
             if entry is None:
                 continue
-            # Key: lane + bike + name + laps + lap_time (top text changes when laps change)
             key = (lane, entry[0], entry[1], entry[2], entry[3])
             if key != last_key[lane]:
-                # left lane bright, right lane dim (you can tweak)
-                dim = (lane == 1)
+                dim = (lane == 1)   # set False if you want both bright
                 tsurf, tw, tcol = make_top_surface(entry, dim=dim)
                 top_surface[lane] = tsurf
                 top_w[lane] = tw
                 time_color[lane] = tcol
                 last_key[lane] = key
-                # keep scroll progressing; if first time or short, clamp correctly
                 scroll[lane] = 0 if tw <= pane_w else scroll[lane] % tw
 
-        # compose final frame
+        # Compose frame
         frame = Image.new("RGB", (width, height), (0, 0, 0))
 
-        # Lane 0 (left pane)
+        # Lane 0 (left)
         if top_surface[0] is not None:
             tw = top_w[0]
             if tw <= pane_w:
@@ -528,7 +538,7 @@ def effect_times(_initial_rider_data_ignored):
                     frame.paste(top_surface[0].crop((0, 0, pane_w - w1, height)), (w1, 0))
                 scroll[0] = (scroll[0] + SCROLL_PX_PER_FRAME) % tw
 
-        # Lane 1 (right pane)
+        # Lane 1 (right)
         if top_surface[1] is not None:
             tw = top_w[1]
             if tw <= pane_w:
@@ -541,19 +551,20 @@ def effect_times(_initial_rider_data_ignored):
                     frame.paste(top_surface[1].crop((0, 0, pane_w - w1, height)), (pane_w + w1, 0))
                 scroll[1] = (scroll[1] + SCROLL_PX_PER_FRAME) % tw
 
-        # draw bottom (static) times directly
+        # Bottom static times
         draw_frame = ImageDraw.Draw(frame)
         if lane_entries[0] is not None:
             draw_frame.text((-1, y1), lane_entries[0][3], font=font, fill=time_color[0])
         if lane_entries[1] is not None:
             draw_frame.text((pane_w - 1, y1), lane_entries[1][3], font=font, fill=time_color[1])
 
-        # push pixels
+        # Push pixels
         for x in range(width):
             for y in range(height):
                 matrix.pixel((x, y), frame.getpixel((x, y)))
         matrix.show()
         matrix.delay(IDLE_SLEEP_MS)
+
 
         
 def effect_startGateCountdown():
