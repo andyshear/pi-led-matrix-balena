@@ -384,10 +384,16 @@ def effect_lastLapAnimation():
 # Adjust the code to make sure the rider's name and time are placed closer together
 def effect_times(_initial_rider_data_ignored):
     """
-    64x16 layout: left 32x16 = current, right 32x16 = previous.
-    Top line (NAME L{laps}) scrolls; bottom line (lap time) is static and drawn directly.
-    Payload: bike-rider-laps-lapTime
+    64x16 layout: two fixed 'lanes' (left=lane 0, right=lane 1).
+    Each rider is permanently assigned to a lane using a stable rule:
+      - If riderId has digits, use last digit % 2
+      - Otherwise use crc32(name) % 2
+    Incoming updates only modify that rider's lane; the other lane is untouched.
+    Top line (NAME/ID + L{laps}) scrolls, bottom line (lap time) is static.
+    Payload: bike-rider-laps-lapTime  (e.g., 'yamaha-#27-11-1:31:35')
     """
+    import re, zlib
+
     # ---- helpers ----
     def parse_quad(payload: str):
         parts = [p.strip() for p in payload.split('-')]
@@ -395,140 +401,152 @@ def effect_times(_initial_rider_data_ignored):
             raise ValueError(f"Invalid rider data format: {payload!r} (expected 4 fields)")
         return parts[0], parts[1], parts[2], parts[3]  # bike, name, laps_str, lap_time
 
-    def record_seen(name: str, lap_time: str, laps_str: str):
+    def lane_for(name: str) -> int:
+        """
+        Stable 0/1 lane assignment.
+        Prefer last digit in the riderId (e.g. '#513' -> 3 -> lane 1).
+        Fallback to crc32(name).
+        """
+        m = re.search(r'(\d)(?!.*\d)', name)
+        if m:
+            return int(m.group(1)) % 2
+        return (zlib.crc32(name.encode('utf-8')) & 1)
+
+    def normalize_laps(name: str, laps_str: str) -> int:
         try:
-            laps_val = int(str(laps_str))
+            return int(str(laps_str))
         except Exception:
-            laps_val = laps_by_rider.get(name, 0)
-        laps_by_rider[name] = laps_val
-        _last_time_by_rider[name] = lap_time
+            return laps_by_rider.get(name, 0)
 
     width, height = 64, 16
     pane_w = 32
     font = ImageFont.load_default()
     line_h = 8
     LINE_GAP = 0
-    y0 = -2
-    y1 = y0 + line_h + LINE_GAP
+    y0 = -2                             # top text baseline
+    y1 = y0 + line_h + LINE_GAP         # bottom text baseline (static time)
 
-    # top-line scroll state only
-    cur_scroll = 0
-    prev_scroll = 0
     SCROLL_PX_PER_FRAME = 2
     IDLE_SLEEP_MS = 20
 
-    # caches (top surfaces only)
-    cur_key = prev_key = None
-    cur_top_surface = prev_top_surface = None
-    cur_top_w = prev_top_w = pane_w
+    # Per-lane state
+    # lane_entries[lane] = (bike, name, laps_str, lap_time)
+    lane_entries = [None, None]
+
+    # Per-lane scroll + caches
+    scroll = [0, 0]
+    top_surface = [None, None]
+    top_w = [pane_w, pane_w]
+    time_color = [(255, 255, 255), (180, 180, 180)]  # left bright, right dim by default
+    last_key = [None, None]
 
     def make_top_surface(entry, dim: bool):
-        """Return (top_surface, top_w, time_color) for an entry."""
+        """
+        entry = (bike, name, laps_str, lap_time)
+        Returns (surface, surface_w, time_color)
+        Top text: "name L{laps}"
+        """
         bike, name, laps_str, lap_time = entry
-        try:
-            laps_val = int(laps_str)
-        except Exception:
-            laps_val = laps_by_rider.get(name, 0)
+        laps_val = normalize_laps(name, laps_str)
         top_text = f"{name} L{laps_val}"
 
         name_color = get_bike_color(bike)
-        time_color = (180, 180, 180) if dim else (255, 255, 255)
+        tcolor = (180, 180, 180) if dim else (255, 255, 255)
 
         # measure width needed for top text
         tmp = Image.new("RGB", (1, 1))
         dd = ImageDraw.Draw(tmp)
         w_top = dd.textbbox((0, 0), top_text, font=font)[2]
-        top_w = max(pane_w, w_top) + 2
+        surf_w = max(pane_w, w_top) + 2
 
-        surf = Image.new("RGB", (top_w, height), (0, 0, 0))
+        surf = Image.new("RGB", (surf_w, height), (0, 0, 0))
         d = ImageDraw.Draw(surf)
         d.text((0, y0), top_text, font=font, fill=name_color)
+        return surf, surf_w, tcolor
 
-        return surf, top_w, time_color
-
+    # Main loop
     while not stop_event.is_set() and get_current_effect() == 'times':
-        # drain queue
+        # ---- drain all queued updates; update only their lane ----
+        updated_any = False
         while True:
             try:
                 payload = times_queue.get_nowait()
             except queue.Empty:
                 break
+
             try:
-                quad = parse_quad(payload)
-                record_seen(quad[1], quad[3], quad[2])
-                if not times_history or times_history[-1] != quad:
-                    times_history.append(quad)
+                bike, name, laps_str, lap_time = parse_quad(payload)
+                # update memory of laps + last time
+                laps_by_rider[name] = normalize_laps(name, laps_str)
+                _last_time_by_rider[name] = lap_time
+
+                lane = lane_for(name)  # 0=left, 1=right
+                # set/replace that lane's current entry
+                lane_entries[lane] = (bike, name, str(laps_by_rider[name]), lap_time)
+                updated_any = True
             except Exception as e:
                 print(f"[times] Skip invalid rider_data={payload!r}: {e}")
 
-        if not times_history:
-            matrix.reset(matrix.color('black')); matrix.show(); matrix.delay(60)
+        # If nothing to show yet, blank and wait
+        if lane_entries[0] is None and lane_entries[1] is None:
+            matrix.reset(matrix.color('black'))
+            matrix.show()
+            matrix.delay(60)
             continue
 
-        current  = times_history[-1]
-        previous = times_history[-2] if len(times_history) >= 2 else current
-
-        cur_laps  = laps_by_rider.get(current[1],  current[2])
-        prev_laps = laps_by_rider.get(previous[1], previous[2])
-        this_cur_key  = ('cur',  current[0],  current[1],  str(cur_laps),  current[3])
-        this_prev_key = ('prev', previous[0], previous[1], str(prev_laps), previous[3])
-
-        if this_cur_key != cur_key:
-            cur_entry = (current[0], current[1], str(cur_laps), current[3])
-            cur_top_surface, cur_top_w, cur_time_color = make_top_surface(cur_entry, dim=False)
-            cur_key = this_cur_key
-            cur_scroll = 0 if cur_top_w <= pane_w else cur_scroll % cur_top_w
-        else:
-            # preserve last computed color
-            try:
-                cur_time_color
-            except NameError:
-                cur_time_color = (255, 255, 255)
-
-        if this_prev_key != prev_key:
-            prev_entry = (previous[0], previous[1], str(prev_laps), previous[3])
-            prev_top_surface, prev_top_w, prev_time_color = make_top_surface(prev_entry, dim=True)
-            prev_key = this_prev_key
-            prev_scroll = 0 if prev_top_w <= pane_w else prev_scroll % prev_top_w
-        else:
-            try:
-                prev_time_color
-            except NameError:
-                prev_time_color = (180, 180, 180)
+        # For each lane, (re)build cache if the content changed
+        for lane in (0, 1):
+            entry = lane_entries[lane]
+            if entry is None:
+                continue
+            # Key: lane + bike + name + laps + lap_time (top text changes when laps change)
+            key = (lane, entry[0], entry[1], entry[2], entry[3])
+            if key != last_key[lane]:
+                # left lane bright, right lane dim (you can tweak)
+                dim = (lane == 1)
+                tsurf, tw, tcol = make_top_surface(entry, dim=dim)
+                top_surface[lane] = tsurf
+                top_w[lane] = tw
+                time_color[lane] = tcol
+                last_key[lane] = key
+                # keep scroll progressing; if first time or short, clamp correctly
+                scroll[lane] = 0 if tw <= pane_w else scroll[lane] % tw
 
         # compose final frame
         frame = Image.new("RGB", (width, height), (0, 0, 0))
 
-        # LEFT pane: paste top scroller
-        if cur_top_surface is not None:
-            if cur_top_w <= pane_w:
-                frame.paste(cur_top_surface.crop((0, 0, pane_w, height)), (0, 0))
+        # Lane 0 (left pane)
+        if top_surface[0] is not None:
+            tw = top_w[0]
+            if tw <= pane_w:
+                frame.paste(top_surface[0].crop((0, 0, pane_w, height)), (0, 0))
             else:
-                x0 = cur_scroll % cur_top_w
-                w1 = min(pane_w, cur_top_w - x0)
-                frame.paste(cur_top_surface.crop((x0, 0, x0 + w1, height)), (0, 0))
+                x0 = scroll[0] % tw
+                w1 = min(pane_w, tw - x0)
+                frame.paste(top_surface[0].crop((x0, 0, x0 + w1, height)), (0, 0))
                 if w1 < pane_w:
-                    frame.paste(cur_top_surface.crop((0, 0, pane_w - w1, height)), (w1, 0))
-                cur_scroll = (cur_scroll + SCROLL_PX_PER_FRAME) % cur_top_w
+                    frame.paste(top_surface[0].crop((0, 0, pane_w - w1, height)), (w1, 0))
+                scroll[0] = (scroll[0] + SCROLL_PX_PER_FRAME) % tw
 
-        # RIGHT pane: paste top scroller
-        if prev_top_surface is not None:
-            if prev_top_w <= pane_w:
-                frame.paste(prev_top_surface.crop((0, 0, pane_w, height)), (pane_w, 0))
+        # Lane 1 (right pane)
+        if top_surface[1] is not None:
+            tw = top_w[1]
+            if tw <= pane_w:
+                frame.paste(top_surface[1].crop((0, 0, pane_w, height)), (pane_w, 0))
             else:
-                x0 = prev_scroll % prev_top_w
-                w1 = min(pane_w, prev_top_w - x0)
-                frame.paste(prev_top_surface.crop((x0, 0, x0 + w1, height)), (pane_w, 0))
+                x0 = scroll[1] % tw
+                w1 = min(pane_w, tw - x0)
+                frame.paste(top_surface[1].crop((x0, 0, x0 + w1, height)), (pane_w, 0))
                 if w1 < pane_w:
-                    frame.paste(prev_top_surface.crop((0, 0, pane_w - w1, height)), (pane_w + w1, 0))
-                prev_scroll = (prev_scroll + SCROLL_PX_PER_FRAME) % prev_top_w
+                    frame.paste(top_surface[1].crop((0, 0, pane_w - w1, height)), (pane_w + w1, 0))
+                scroll[1] = (scroll[1] + SCROLL_PX_PER_FRAME) % tw
 
-        # draw bottom (static) times directly onto frame so nothing covers the scroller
+        # draw bottom (static) times directly
         draw_frame = ImageDraw.Draw(frame)
-        # left pane time
-        draw_frame.text((-1, y1), current[3], font=font, fill=cur_time_color)
-        # right pane time
-        draw_frame.text((pane_w - 1, y1), previous[3], font=font, fill=prev_time_color)
+        if lane_entries[0] is not None:
+            draw_frame.text((-1, y1), lane_entries[0][3], font=font, fill=time_color[0])
+        if lane_entries[1] is not None:
+            draw_frame.text((pane_w - 1, y1), lane_entries[1][3], font=font, fill=time_color[1])
 
         # push pixels
         for x in range(width):
