@@ -383,26 +383,24 @@ def effect_lastLapAnimation():
 
 def effect_times(_initial_rider_data_ignored):
     """
-    128x16 layout: four panes across (32x16 each)
-      Lane 0: x 0..31
-      Lane 1: x 32..63
-      Lane 2: x 64..95
-      Lane 3: x 96..127
+    128x16 layout with 4 horizontal lanes (each 32x16):
+      Lane 0 | Lane 1 | Lane 2 | Lane 3
 
-    Behavior:
-      - First time we see a rider, assign lane in strict round-robin (sticky).
-      - On any update, jump that rider to the front of their lane immediately.
-      - No marquee, no lap-count. Top row = rider (bike-colored). Bottom row = time (white).
-      - Each lane rotates its roster forever on a fixed interval.
+    - First time a rider is seen, they are assigned to the next lane in sequence
+      (0→1→2→3→0…) and remain sticky there.
+    - On update, that rider is shown immediately in their lane.
+    - Each lane cycles through its roster forever on a fixed interval.
+    - No marquee; rider number and time are static positions inside the pane.
+
+    Payload from Node: "bike-#RIDERNUM-laps-lapTime"
     """
     import time
-    from PIL import Image, ImageDraw, ImageFont
 
-    # ---- helpers ----
+    # ----- helpers -----
     def parse_quad(payload: str):
         parts = [p.strip() for p in payload.split('-')]
         if len(parts) != 4:
-            raise ValueError(f"Invalid rider data: {payload!r}")
+            raise ValueError(f"Invalid rider data format: {payload!r} (expected 4 fields)")
         return parts[0], parts[1], parts[2], parts[3]  # bike, name, laps_str, lap_time
 
     def record_seen(name: str, lap_time: str, laps_str: str):
@@ -413,56 +411,47 @@ def effect_times(_initial_rider_data_ignored):
         laps_by_rider[name] = laps_val
         _last_time_by_rider[name] = lap_time
 
-    # ---- geometry: 4 lanes across ----
-    width, height = pixel_width, pixel_height  # expect 128x16
-    LANES = 4
-    pane_w = width // 4          # 32
-    pane_h = height              # 16
+    # ----- geometry -----
+    WIDTH, HEIGHT = pixel_width, pixel_height  # 128x16 from your config
+    NUM_LANES = 4
+    PANE_W = WIDTH // NUM_LANES  # 32
+    PANE_H = HEIGHT              # 16
 
-    # text rows (no scrolling)
     font = ImageFont.load_default()
-    NAME_Y = 0                   # top row for rider label
-    TIME_Y = 8                   # bottom row for time
+    line_h = 8
 
-    # ---- timing knobs ----
+    # vertical placement (lift everything by -2px to remove the gap you saw)
+    Y_OFFSET = -2
+    NAME_Y = Y_OFFSET            # top line: rider number (fixed)
+    TIME_Y = NAME_Y + line_h     # bottom line: lap time (fixed)
+
+    # ----- cycling & speed knobs -----
     IDLE_SLEEP_MS = 20
-    ROTATE_INTERVAL_MS = 1500    # “every couple seconds” – tweak as you like
+    ROTATE_INTERVAL_MS = 900  # per-lane rotation cadence
 
-    # ---- sticky lane state ----
-    rider_lane = {}                              # name -> lane [0..3]
-    next_lane_toggle = 0                         # 0,1,2,3,0,...
-
-    lane_roster = [[] for _ in range(LANES)]     # ordered unique names per lane
-    lane_active_idx = [0] * LANES
-    lane_next_rotate_at = [0] * LANES
+    # ----- lane bookkeeping -----
+    rider_lane = {}                       # name -> lane idx
+    next_lane_toggle = 0                  # 0..3 round-robin
+    lane_roster = [[] for _ in range(NUM_LANES)]
+    lane_active_idx = [0 for _ in range(NUM_LANES)]
+    lane_next_rotate_at = [0 for _ in range(NUM_LANES)]
 
     # latest record per rider
-    rider_rec = {}                               # name -> (bike, name, laps_str, lap_time)
-
-    # simple text helpers
-    def lane_origin(lane: int):
-        return lane * pane_w, 0
-
-    def right_text_x(draw: ImageDraw.ImageDraw, text: str) -> int:
-        if not text:
-            return 0
-        bbox = draw.textbbox((0, 0), text, font=font)
-        text_w = bbox[2] - bbox[0]
-        return max(0, pane_w - 1 - text_w)
+    rider_rec = {}  # name -> (bike, name, laps_str, lap_time)
 
     def assign_lane_if_new(name: str):
         nonlocal next_lane_toggle
         if name in rider_lane:
             return rider_lane[name]
         lane = next_lane_toggle
-        next_lane_toggle = (next_lane_toggle + 1) % LANES
+        next_lane_toggle = (next_lane_toggle + 1) % NUM_LANES
         rider_lane[name] = lane
         if name not in lane_roster[lane]:
             lane_roster[lane].append(name)
         return lane
 
     def set_active_to(name: str, lane: int):
-        """Jump to this rider immediately, and hold until next interval."""
+        """Show this rider immediately in their lane and hold until next interval."""
         try:
             idx = lane_roster[lane].index(name)
         except ValueError:
@@ -484,45 +473,46 @@ def effect_times(_initial_rider_data_ignored):
                 bike, name, laps_str, lap_time = parse_quad(payload)
                 record_seen(name, lap_time, laps_str)
                 rider_rec[name] = (bike, name, laps_str, lap_time)
-
                 lane = assign_lane_if_new(name)
                 if name not in lane_roster[lane]:
                     lane_roster[lane].append(name)
-
-                set_active_to(name, lane)  # show update instantly
+                set_active_to(name, lane)  # instant show on update
             except Exception as e:
                 print(f"[times] Skip invalid rider_data={payload!r}: {e}")
 
-        # ---- per-lane rotation ----
-        for lane in range(LANES):
+        # ---- rotate lanes on interval ----
+        for lane in range(NUM_LANES):
             if not lane_roster[lane]:
                 continue
             if now_ms >= lane_next_rotate_at[lane]:
                 lane_active_idx[lane] = (lane_active_idx[lane] + 1) % len(lane_roster[lane])
                 lane_next_rotate_at[lane] = now_ms + ROTATE_INTERVAL_MS
 
-        # ---- compose frame (no marquee) ----
-        frame = Image.new("RGB", (width, height), (0, 0, 0))
+        # ---- compose frame (single PIL frame, then blit to matrix) ----
+        frame = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
         draw = ImageDraw.Draw(frame)
 
-        for lane in range(LANES):
+        for lane in range(NUM_LANES):
             if not lane_roster[lane]:
                 continue
-            ox, oy = lane_origin(lane)
 
-            nameX = lane_roster[lane][lane_active_idx[lane]]
-            bike, nm, _, lap_timeX = rider_rec.get(nameX, (None, "", "", ""))
+            pane_x0 = lane * PANE_W  # left edge of this lane
+            active_name = lane_roster[lane][lane_active_idx[lane]]
 
-            # Rider label (left, bike color)
-            draw.text((ox, oy + NAME_Y), nm, font=font, fill=get_bike_color(bike or ""))
+            # pull data
+            bike, nm, _laps_str, lap_time = rider_rec.get(active_name, ("", active_name, "", ""))
 
-            # Lap time (right-aligned, white)
-            tx = ox + right_text_x(draw, lap_timeX)
-            draw.text((tx, oy + TIME_Y), lap_timeX, font=font, fill=(255, 255, 255))
+            # choose colors (brand for number, white for time)
+            num_color = get_bike_color(bike)
+            time_color = (255, 255, 255)
+
+            # draw number (top) and time (bottom), fixed positions
+            draw.text((pane_x0, NAME_Y), nm, font=font, fill=num_color)
+            draw.text((pane_x0, TIME_Y), lap_time, font=font, fill=time_color)
 
         # ---- push pixels ----
-        for x in range(width):
-            for y in range(height):
+        for x in range(WIDTH):
+            for y in range(HEIGHT):
                 matrix.pixel((x, y), frame.getpixel((x, y)))
         matrix.show()
         matrix.delay(IDLE_SLEEP_MS)
