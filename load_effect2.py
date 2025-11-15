@@ -381,27 +381,38 @@ def effect_lastLapAnimation():
         # Keep the pattern displayed for a while before checking if the effect should stop
         matrix.delay(1000)
 
-# Adjust the code to make sure the rider's name and time are placed closer together
 def effect_times(_initial_rider_data_ignored):
     """
-    64x16 layout: left 32x16 = Lane 0, right 32x16 = Lane 1.
+    Grid scoreboard with sticky round-robin lane assignment.
 
-    Per-lane behavior:
-      - Strict alternating lane assignment on first sight (sticky thereafter).
+    Layout:
+      - The full matrix is split into LANE_ROWS x LANE_COLS panes.
+      - Each pane ("lane") shows one rider at a time:
+          top line (scroll):  "{name} L{laps}"  (bike-colored)
+          bottom line:       lap time (white)
+      - On a rider’s FIRST sighting, we assign them to the next lane (0..N-1) and keep
+        them sticky there forever.
       - On update, that rider is shown IMMEDIATELY in their lane.
       - Each lane cycles through all of its riders on a fixed interval, forever.
 
-    Top line (scroll):  "{name} L{laps}"
-    Bottom line (fixed): lap time
-    Payload from Node:  "bike-name-laps-lapTime"
+    Payload from Node: "bike-name-laps-lapTime"
     """
     import time
+    from PIL import Image, ImageDraw, ImageFont
 
-    # ---------- helpers ----------
+    # ------- configure your grid here -------
+    LANE_COLS = 2          # number of panes across the width
+    LANE_ROWS = 2          # number of panes down the height
+    ROTATE_INTERVAL_MS = 900
+    SCROLL_PX_PER_FRAME = 2
+    IDLE_SLEEP_MS = 20
+    LEFT_PAD = 0           # tweak if you want slight inset for the time text
+
+    # ------- helpers -------
     def parse_quad(payload: str):
         parts = [p.strip() for p in payload.split('-')]
         if len(parts) != 4:
-            raise ValueError(f"Invalid rider data format: {payload!r} (expected 4 fields)")
+            raise ValueError(f"Invalid rider data: {payload!r}")
         return parts[0], parts[1], parts[2], parts[3]  # bike, name, laps_str, lap_time
 
     def record_seen(name: str, lap_time: str, laps_str: str):
@@ -412,92 +423,79 @@ def effect_times(_initial_rider_data_ignored):
         laps_by_rider[name] = laps_val
         _last_time_by_rider[name] = lap_time
 
-    # ---------- layout ----------
-    width, height = 64, 16
-    pane_w = 32
+    # ------- derive pane geometry from your actual matrix -------
+    W, H = pixel_width, pixel_height  # from your Matrix driver
+    LANES = LANE_COLS * LANE_ROWS
+
+    # pane size
+    pane_w = max(1, W // LANE_COLS)
+    pane_h = max(1, H // LANE_ROWS)
 
     font = ImageFont.load_default()
-    line_h = 8
-    LINE_GAP = 0
-    y0 = -2                        # top text (scrolling)
-    y1 = y0 + line_h + LINE_GAP    # bottom time (fixed)
+    # vertical placement: top line and bottom line within the pane
+    # try to center the pair roughly in the pane
+    line_h = 8  # default font height-ish
+    y0 = max(0, pane_h // 2 - line_h - 1)     # top text baseline
+    y1 = min(pane_h - line_h, pane_h // 2 + 1) # bottom text baseline
 
-    # ---------- cycling & speed knobs ----------
-    SCROLL_PX_PER_FRAME = 2        # marquee speed
-    IDLE_SLEEP_MS = 20             # main loop delay
-    ROTATE_INTERVAL_MS = 900       # how often each lane steps to next rider
-                                   # (lower = faster flipping)
+    # ------- sticky lane assignment (perfectly balanced round-robin) -------
+    rider_lane = {}                       # name -> lane index [0..LANES-1]
+    next_lane_toggle = 0                  # cycles 0..LANES-1
 
-    # ---------- sticky, perfectly balanced lanes ----------
-    rider_lane = {}                # name -> lane (0/1), assigned on FIRST sighting only
-    next_lane_toggle = 0           # strictly alternate new riders 0,1,0,1...
+    lane_roster = [[] for _ in range(LANES)]          # rider names per lane (no dupes)
+    lane_active_idx = [0 for _ in range(LANES)]       # which rider is shown per lane
+    lane_next_rotate_at = [0 for _ in range(LANES)]   # epoch ms per lane
 
-    # Per-lane ordered rosters (arrival order; no duplicates)
-    lane_roster = [[], []]         # list of rider names per lane
-    lane_active_idx = [0, 0]       # which index is currently shown per lane
-    lane_next_rotate_at = [0, 0]   # next time to rotate per lane (epoch ms)
+    # caches
+    rider_rec = {}                          # name -> (bike, name, laps_str, lap_time)
+    top_cache = {}                          # name -> (surf, surf_w, key)
+                                            # key := (bike, name, laps_val, lap_time)
+    scroll_x = [0 for _ in range(LANES)]    # marquee offset per lane
 
-    # Cache: latest record per rider
-    rider_rec = {}                 # name -> (bike, name, laps_str, lap_time)
-
-    # Cache: per-rider top scroller surface
-    top_cache = {}                 # name -> (surf, surf_w, key)
-                                   # key := (bike,name,laps_val,lap_time)
-
-    # Per-lane scroll state
-    scroll_x = [0, 0]
-
-    def assign_lane_if_new(name: str):
+    def assign_lane_if_new(name: str) -> int:
         nonlocal next_lane_toggle
         if name in rider_lane:
             return rider_lane[name]
         lane = next_lane_toggle
-        next_lane_toggle ^= 1
+        next_lane_toggle = (next_lane_toggle + 1) % LANES
         rider_lane[name] = lane
-        # append to roster if not present
         if name not in lane_roster[lane]:
             lane_roster[lane].append(name)
         return lane
 
     def set_active_to(name: str, lane: int):
-        """Jump the active index to this rider immediately."""
+        """Jump that lane to this rider immediately and reset rotate timer."""
         try:
             idx = lane_roster[lane].index(name)
         except ValueError:
-            # Should not happen, but ensure present if out-of-order
             lane_roster[lane].append(name)
             idx = len(lane_roster[lane]) - 1
         lane_active_idx[lane] = idx
-        # reset rotate timer so this rider holds until the next full interval
         lane_next_rotate_at[lane] = int(time.time() * 1000) + ROTATE_INTERVAL_MS
 
     def make_top_surface(entry):
-        """
-        entry = (bike, name, laps_str, lap_time)
-        Return (surface, surf_w) containing only top line at y0.
-        """
+        """Render the top scroller surface for a given (bike, name, laps_str, lap_time)."""
         bike, name, laps_str, lap_time = entry
-        # normalize laps from our store
         try:
             laps_val = int(laps_str)
         except Exception:
             laps_val = laps_by_rider.get(name, 0)
-        top_text = f"{name} L{laps_val}"
 
-        # measure
+        top_text = f"{name} L{laps_val}"
+        # measure width needed
         tmp = Image.new("RGB", (1, 1))
         dd = ImageDraw.Draw(tmp)
         w_top = dd.textbbox((0, 0), top_text, font=font)[2]
         surf_w = max(pane_w, w_top) + 2
 
-        surf = Image.new("RGB", (surf_w, height), (0, 0, 0))
+        surf = Image.new("RGB", (surf_w, pane_h), (0, 0, 0))
         d = ImageDraw.Draw(surf)
         name_rgb = get_bike_color(bike)
         d.text((0, y0), top_text, font=font, fill=name_rgb)
         return surf, surf_w
 
     def get_top_surface_for(name: str):
-        """Return (surface, width) for rider's top line, re-rendering if key changed."""
+        """Return (surface, width) for the rider’s top line (cached per rider)."""
         if name not in rider_rec:
             return None, pane_w
         bike, nm, laps_str, lap_time = rider_rec[name]
@@ -508,7 +506,6 @@ def effect_times(_initial_rider_data_ignored):
         if cached and cached[2] == key:
             return cached[0], cached[1]
 
-        # (re)build
         surf, w = make_top_surface((bike, nm, str(laps_val), lap_time))
         top_cache[nm] = (surf, w, key)
         return surf, w
@@ -516,8 +513,7 @@ def effect_times(_initial_rider_data_ignored):
     while not stop_event.is_set() and get_current_effect() == 'times':
         now_ms = int(time.time() * 1000)
 
-        # ---- drain queue (non-blocking) ----
-        updated_names = set()
+        # ---- drain inbound queue (non-blocking) ----
         while True:
             try:
                 payload = times_queue.get_nowait()
@@ -529,73 +525,63 @@ def effect_times(_initial_rider_data_ignored):
                 rider_rec[name] = (bike, name, laps_str, lap_time)
 
                 lane = assign_lane_if_new(name)
-                # ensure in roster exactly once
                 if name not in lane_roster[lane]:
                     lane_roster[lane].append(name)
 
-                # Show this updated rider immediately in their lane
+                # show this updated rider immediately in their lane
                 set_active_to(name, lane)
-                updated_names.add(name)
 
             except Exception as e:
                 print(f"[times] Skip invalid rider_data={payload!r}: {e}")
 
-        # ---- cycle lanes on interval (forever) ----
-        for lane in (0, 1):
+        # ---- rotate each lane on its interval ----
+        for lane in range(LANES):
             if not lane_roster[lane]:
                 continue
             if now_ms >= lane_next_rotate_at[lane]:
-                # step to next rider, even if no new updates
                 lane_active_idx[lane] = (lane_active_idx[lane] + 1) % len(lane_roster[lane])
                 lane_next_rotate_at[lane] = now_ms + ROTATE_INTERVAL_MS
 
-        # ---- compose frame ----
-        frame = Image.new("RGB", (width, height), (0, 0, 0))
+        # ---- compose final frame ----
+        frame = Image.new("RGB", (W, H), (0, 0, 0))
         draw = ImageDraw.Draw(frame)
 
-        # Lane 0 (left)
-        if lane_roster[0]:
-            name0 = lane_roster[0][lane_active_idx[0]]
-            surf0, w0 = get_top_surface_for(name0)
-            if surf0 is not None:
-                if w0 <= pane_w:
-                    frame.paste(surf0.crop((0, 0, pane_w, height)), (0, 0))
+        for lane in range(LANES):
+            if not lane_roster[lane]:
+                continue
+
+            # map lane index -> (col,row) -> (pane_x, pane_y)
+            lane_row = lane // LANE_COLS
+            lane_col = lane % LANE_COLS
+            pane_x = lane_col * pane_w
+            pane_y = lane_row * pane_h
+
+            nameX = lane_roster[lane][lane_active_idx[lane]]
+            surf, wsurf = get_top_surface_for(nameX)
+            if surf is not None:
+                if wsurf <= pane_w:
+                    # fits in pane: single blit
+                    frame.paste(surf.crop((0, 0, pane_w, pane_h)), (pane_x, pane_y))
                 else:
-                    x0 = scroll_x[0] % w0
-                    w1 = min(pane_w, w0 - x0)
-                    frame.paste(surf0.crop((x0, 0, x0 + w1, height)), (0, 0))
+                    # marquee horizontally within the pane
+                    sx = scroll_x[lane] % wsurf
+                    w1 = min(pane_w, wsurf - sx)
+                    frame.paste(surf.crop((sx, 0, sx + w1, pane_h)), (pane_x, pane_y))
                     if w1 < pane_w:
-                        frame.paste(surf0.crop((0, 0, pane_w - w1, height)), (w1, 0))
-                    scroll_x[0] = (scroll_x[0] + SCROLL_PX_PER_FRAME) % w0
+                        frame.paste(surf.crop((0, 0, pane_w - w1, pane_h)), (pane_x + w1, pane_y))
+                    scroll_x[lane] = (scroll_x[lane] + SCROLL_PX_PER_FRAME) % wsurf
 
-                # bottom time (bright white)
-                _, nm0, _, lap_time0 = rider_rec.get(name0, (None, "", "", ""))
-                draw.text((-1, y1), lap_time0, font=font, fill=(255, 255, 255))
-
-        # Lane 1 (right)
-        if lane_roster[1]:
-            name1 = lane_roster[1][lane_active_idx[1]]
-            surf1, w1 = get_top_surface_for(name1)
-            if surf1 is not None:
-                if w1 <= pane_w:
-                    frame.paste(surf1.crop((0, 0, pane_w, height)), (pane_w, 0))
-                else:
-                    x0 = scroll_x[1] % w1
-                    ww1 = min(pane_w, w1 - x0)
-                    frame.paste(surf1.crop((x0, 0, x0 + ww1, height)), (pane_w, 0))
-                    if ww1 < pane_w:
-                        frame.paste(surf1.crop((0, 0, pane_w - ww1, height)), (pane_w + ww1, 0))
-                    scroll_x[1] = (scroll_x[1] + SCROLL_PX_PER_FRAME) % w1
-
-                _, nm1, _, lap_time1 = rider_rec.get(name1, (None, "", "", ""))
-                draw.text((pane_w - 1, y1), lap_time1, font=font, fill=(255, 255, 255))
+                # bottom time (bright white), left-aligned within the pane
+                _, _, _, lap_timeX = rider_rec.get(nameX, (None, "", "", ""))
+                draw.text((pane_x + LEFT_PAD, pane_y + y1), lap_timeX, font=font, fill=(255, 255, 255))
 
         # ---- push pixels ----
-        for x in range(width):
-            for y in range(height):
+        for x in range(W):
+            for y in range(H):
                 matrix.pixel((x, y), frame.getpixel((x, y)))
         matrix.show()
         matrix.delay(IDLE_SLEEP_MS)
+
 
 
         
