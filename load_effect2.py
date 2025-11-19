@@ -381,18 +381,27 @@ def effect_lastLapAnimation():
         # Keep the pattern displayed for a while before checking if the effect should stop
         matrix.delay(1000)
 
+def handle_timer_cmd(payload: dict):
+    global race_timer_start_ms, race_timer_label
+    # payload: {"effect":"timer", "startMs": <int|null>, "label": <str|optional>}
+    start_ms = payload.get("startMs", None)
+    label = payload.get("label", "")
+    if start_ms is None:
+        race_timer_start_ms = None
+        race_timer_label = ""
+        print("[timer] cleared")
+    else:
+        race_timer_start_ms = int(start_ms)
+        race_timer_label = str(label or "")
+        print(f"[timer] startMs={race_timer_start_ms} label={race_timer_label}")
+
 def effect_times(_initial_rider_data_ignored):
     """
-    128x16 layout with 4 horizontal lanes (each 32x16):
-      Lane 0 | Lane 1 | Lane 2 | Lane 3
+    128x16, 4 lanes (each 32x16). If race timer is active, Lane 0 shows the timer
+    and riders occupy lanes 1..3. Otherwise riders occupy all 4 lanes.
 
-    - First time a rider is seen, they are assigned to the next lane in sequence
-      (0→1→2→3→0…) and remain sticky there.
-    - On update, that rider is shown immediately in their lane.
-    - Each lane cycles through its roster forever on a fixed interval.
-    - No marquee; rider number and time are static positions inside the pane.
-
-    Payload from Node: "bike-#RIDERNUM-laps-lapTime"
+    Payload from Node for riders: "bike-#RIDERNUM-laps-lapTime"
+    Timer control comes via {"effect":"timer","startMs":<epoch_ms>|null,"label":"..."}.
     """
     import time
 
@@ -420,38 +429,46 @@ def effect_times(_initial_rider_data_ignored):
     font = ImageFont.load_default()
     line_h = 8
 
-    # vertical placement (lift everything by -2px to remove the gap you saw)
+    # vertical placement (lift everything by -2px to remove the gap)
     Y_OFFSET = -2
-    NAME_Y = Y_OFFSET            # top line: rider number (fixed)
-    TIME_Y = NAME_Y + line_h     # bottom line: lap time (fixed)
+    NAME_Y = Y_OFFSET
+    TIME_Y = NAME_Y + line_h
 
-    # ----- cycling & speed knobs -----
+    # ----- cycling knobs -----
     IDLE_SLEEP_MS = 20
-    ROTATE_INTERVAL_MS = 900  # per-lane rotation cadence
+    ROTATE_INTERVAL_MS = 900
 
     # ----- lane bookkeeping -----
-    rider_lane = {}                       # name -> lane idx
-    next_lane_toggle = 0                  # 0..3 round-robin
+    rider_lane = {}                       # name -> lane idx (0..3 sticky)
+    next_lane_toggle = 0                  # round-robin assignment
     lane_roster = [[] for _ in range(NUM_LANES)]
     lane_active_idx = [0 for _ in range(NUM_LANES)]
     lane_next_rotate_at = [0 for _ in range(NUM_LANES)]
+    rider_rec = {}                        # name -> (bike, name, laps_str, lap_time)
 
-    # latest record per rider
-    rider_rec = {}  # name -> (bike, name, laps_str, lap_time)
-
-    def assign_lane_if_new(name: str):
+    def assign_lane_if_new(name: str, first_lane: int, last_lane: int):
+        """
+        Assign into [first_lane, last_lane] inclusive, round-robin, sticky thereafter.
+        """
         nonlocal next_lane_toggle
         if name in rider_lane:
-            return rider_lane[name]
-        lane = next_lane_toggle
-        next_lane_toggle = (next_lane_toggle + 1) % NUM_LANES
+            lane = rider_lane[name]
+            # If timer toggled and lane is now outside the active range, reassign once.
+            if lane < first_lane or lane > last_lane:
+                lane = first_lane + ((next_lane_toggle) % (last_lane - first_lane + 1))
+                next_lane_toggle += 1
+                rider_lane[name] = lane
+            return lane
+
+        span = (last_lane - first_lane + 1)
+        lane = first_lane + (next_lane_toggle % span)
+        next_lane_toggle += 1
         rider_lane[name] = lane
         if name not in lane_roster[lane]:
             lane_roster[lane].append(name)
         return lane
 
     def set_active_to(name: str, lane: int):
-        """Show this rider immediately in their lane and hold until next interval."""
         try:
             idx = lane_roster[lane].index(name)
         except ValueError:
@@ -460,10 +477,23 @@ def effect_times(_initial_rider_data_ignored):
         lane_active_idx[lane] = idx
         lane_next_rotate_at[lane] = int(time.time() * 1000) + ROTATE_INTERVAL_MS
 
+    # simple mm:ss formatter
+    def fmt_mmss(total_ms: int) -> str:
+        total_s = max(0, total_ms // 1000)
+        m = total_s // 60
+        s = total_s % 60
+        return f"{m}:{s:02d}"
+
     while not stop_event.is_set() and get_current_effect() == 'times':
         now_ms = int(time.time() * 1000)
 
-        # ---- drain queue (non-blocking) ----
+        # Timer active?
+        timer_active = (race_timer_start_ms is not None)
+        # When timer is active, riders use lanes 1..3. Otherwise 0..3.
+        riders_first_lane = 1 if timer_active else 0
+        riders_last_lane  = 3
+
+        # ---- drain rider queue ----
         while True:
             try:
                 payload = times_queue.get_nowait()
@@ -473,40 +503,51 @@ def effect_times(_initial_rider_data_ignored):
                 bike, name, laps_str, lap_time = parse_quad(payload)
                 record_seen(name, lap_time, laps_str)
                 rider_rec[name] = (bike, name, laps_str, lap_time)
-                lane = assign_lane_if_new(name)
+
+                lane = assign_lane_if_new(name, riders_first_lane, riders_last_lane)
                 if name not in lane_roster[lane]:
                     lane_roster[lane].append(name)
-                set_active_to(name, lane)  # instant show on update
+                set_active_to(name, lane)
             except Exception as e:
                 print(f"[times] Skip invalid rider_data={payload!r}: {e}")
 
-        # ---- rotate lanes on interval ----
-        for lane in range(NUM_LANES):
+        # ---- rotate rider lanes ----
+        for lane in range(riders_first_lane, riders_last_lane + 1):
             if not lane_roster[lane]:
                 continue
             if now_ms >= lane_next_rotate_at[lane]:
                 lane_active_idx[lane] = (lane_active_idx[lane] + 1) % len(lane_roster[lane])
                 lane_next_rotate_at[lane] = now_ms + ROTATE_INTERVAL_MS
 
-        # ---- compose frame (single PIL frame, then blit to matrix) ----
+        # ---- compose frame ----
         frame = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
         draw = ImageDraw.Draw(frame)
 
-        for lane in range(NUM_LANES):
+        # Draw timer in Lane 0 if active
+        if timer_active:
+            elapsed_ms = now_ms - race_timer_start_ms
+            t_str = fmt_mmss(elapsed_ms)
+            pane_x0 = 0
+            # label (small, top)
+            if race_timer_label:
+                draw.text((pane_x0, NAME_Y), str(race_timer_label), font=font, fill=(80, 160, 255))
+                draw.text((pane_x0, TIME_Y), t_str, font=font, fill=(255, 255, 255))
+            else:
+                # no label: show only big time (still two text rows due to 8px font)
+                draw.text((pane_x0, NAME_Y), t_str, font=font, fill=(255, 255, 255))
+
+        # Draw rider panes
+        for lane in range(riders_first_lane, riders_last_lane + 1):
             if not lane_roster[lane]:
                 continue
-
-            pane_x0 = lane * PANE_W  # left edge of this lane
+            pane_x0 = lane * PANE_W
             active_name = lane_roster[lane][lane_active_idx[lane]]
 
-            # pull data
             bike, nm, _laps_str, lap_time = rider_rec.get(active_name, ("", active_name, "", ""))
 
-            # choose colors (brand for number, white for time)
             num_color = get_bike_color(bike)
             time_color = (255, 255, 255)
 
-            # draw number (top) and time (bottom), fixed positions
             draw.text((pane_x0, NAME_Y), nm, font=font, fill=num_color)
             draw.text((pane_x0, TIME_Y), lap_time, font=font, fill=time_color)
 
@@ -609,6 +650,7 @@ effects = {
     'lastLap': effect_lastLap,
     'off': effect_off,
     'times': effect_times,
+    'timer': handle_timer_cmd,
     'startGateCountdown': effect_startGateCountdown,
 }
 
@@ -647,6 +689,9 @@ def listen_for_commands():
             data = json.loads(input_data)
 
             effect_name = data.get('effect', None)
+            if effect_name == "timer":
+                handle_timer_cmd(data)
+                continue
             rider_data = data.get('riderData', None)
 
             if effect_name and effect_name in effects:
