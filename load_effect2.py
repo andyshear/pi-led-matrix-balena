@@ -25,6 +25,9 @@ SCROLL_DELAY = 20  # milliseconds for scroll speed
 MESSAGE = "CAUTION"
 FONT_SIZE = 8  # Adjust as needed
 FONT_PATH = "path/to/font.ttf"  # Adjust the font path as necessary
+# ---- race timer state (shared across effects) ----
+race_timer_start_ms = None   # epoch ms or None when off
+race_timer_label = ""        # e.g. "M1" or "PRACT"
 
 def set_current_effect(effect):
     global current_effect
