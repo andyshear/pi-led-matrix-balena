@@ -400,8 +400,8 @@ def handle_timer_cmd(payload: dict):
 
 def effect_times(_initial_rider_data_ignored):
     """
-    128x16, 4 lanes (each 32x16). If race timer is active, Lane 0 shows the timer
-    and riders occupy lanes 1..3. Otherwise riders occupy all 4 lanes.
+    160x16, 5 lanes (each 32x16). If race timer is active, Lane 0 shows the timer
+    and riders occupy lanes 1..4. Otherwise riders occupy all 5 lanes.
 
     Payload from Node for riders: "bike-#RIDERNUM-laps-lapTime"
     Timer control comes via {"effect":"timer","startMs":<epoch_ms>|null,"label":"..."}.
@@ -424,9 +424,9 @@ def effect_times(_initial_rider_data_ignored):
         _last_time_by_rider[name] = lap_time
 
     # ----- geometry -----
-    WIDTH, HEIGHT = pixel_width, pixel_height  # 128x16 from your config
-    NUM_LANES = 4
-    PANE_W = WIDTH // NUM_LANES  # 32
+    WIDTH, HEIGHT = pixel_width, pixel_height  # should now be 160x16 in your config
+    NUM_LANES = 5
+    PANE_W = WIDTH // NUM_LANES  # 32 when WIDTH=160
     PANE_H = HEIGHT              # 16
 
     font = ImageFont.load_default()
@@ -442,7 +442,7 @@ def effect_times(_initial_rider_data_ignored):
     ROTATE_INTERVAL_MS = 900
 
     # ----- lane bookkeeping -----
-    rider_lane = {}                       # name -> lane idx (0..3 sticky)
+    rider_lane = {}                       # name -> lane idx (0..NUM_LANES-1 sticky)
     next_lane_toggle = 0                  # round-robin assignment
     lane_roster = [[] for _ in range(NUM_LANES)]
     lane_active_idx = [0 for _ in range(NUM_LANES)]
@@ -458,7 +458,7 @@ def effect_times(_initial_rider_data_ignored):
             lane = rider_lane[name]
             # If timer toggled and lane is now outside the active range, reassign once.
             if lane < first_lane or lane > last_lane:
-                lane = first_lane + ((next_lane_toggle) % (last_lane - first_lane + 1))
+                lane = first_lane + (next_lane_toggle % (last_lane - first_lane + 1))
                 next_lane_toggle += 1
                 rider_lane[name] = lane
             return lane
@@ -492,9 +492,10 @@ def effect_times(_initial_rider_data_ignored):
 
         # Timer active?
         timer_active = (race_timer_start_ms is not None)
-        # When timer is active, riders use lanes 1..3. Otherwise 0..3.
+
+        # When timer is active, riders use lanes 1..(NUM_LANES-1). Otherwise 0..(NUM_LANES-1).
         riders_first_lane = 1 if timer_active else 0
-        riders_last_lane  = 3
+        riders_last_lane  = NUM_LANES - 1
 
         # ---- drain rider queue ----
         while True:
@@ -531,12 +532,13 @@ def effect_times(_initial_rider_data_ignored):
             elapsed_ms = now_ms - race_timer_start_ms
             t_str = fmt_mmss(elapsed_ms)
             pane_x0 = 0
+
             # label (small, top)
             if race_timer_label:
                 draw.text((pane_x0, NAME_Y), str(race_timer_label), font=font, fill=(80, 160, 255))
                 draw.text((pane_x0, TIME_Y), t_str, font=font, fill=(255, 255, 255))
             else:
-                # no label: show only big time (still two text rows due to 8px font)
+                # no label: show only time (still two text rows due to 8px font)
                 draw.text((pane_x0, NAME_Y), t_str, font=font, fill=(255, 255, 255))
 
         # Draw rider panes
