@@ -34,6 +34,7 @@ VIRTUAL_ENV = False
 VIRTUAL_SIZE_MULTIPLIER = 10
 
 # size of matrix (allow balena env override)
+print("RAW_ENV PIXEL_WIDTH:", os.environ.get("PIXEL_WIDTH"))
 pixel_width = int(os.environ.get("PIXEL_WIDTH", cfg["pixel_width"]))
 pixel_height = int(os.environ.get("PIXEL_HEIGHT", cfg["pixel_height"]))
 
