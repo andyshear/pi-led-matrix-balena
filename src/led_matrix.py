@@ -17,22 +17,6 @@ with open(CONFIG, mode='r',  encoding='utf8') as j_object:
     cfg = json.load(j_object)
 
 # size of matrix
-pixel_width = cfg['pixel_width']
-pixel_height = cfg['pixel_height']
-
-# brightness 0 - 1
-brightness = float(os.environ.get('BRIGHTNESS', 0.9))  # Ensure float brightness
-print("BRIGHTNESS",brightness)
-
-#contrast (1 is no change)
-contrast = cfg['contrast']
-
-#color (1 is no change)
-color = cfg['color']
-
-# framerate between renderings in milliseconds in virtual mode
-# this mimics the delay of hardware latency
-virtual_framerate = cfg['virtual_framerate']
 
 # playlists follow this format:
 # [
@@ -42,13 +26,41 @@ virtual_framerate = cfg['virtual_framerate']
 #    {'effect': 'water_ripple', 'argv':[]},
 # ]
 playlist = cfg['playlist']
-playlist_delay = cfg['playlist_delay']
 
 # config and mapping for virtual env vs pi with LED matrix
 # Virtual env only works if it is a constant event loop
 VIRTUAL_ENV = False
 
 VIRTUAL_SIZE_MULTIPLIER = 10
+
+# size of matrix (allow balena env override)
+pixel_width = int(os.environ.get("PIXEL_WIDTH", cfg["pixel_width"]))
+pixel_height = int(os.environ.get("PIXEL_HEIGHT", cfg["pixel_height"]))
+
+# brightness 0 - 1 (allow balena env override)
+brightness = float(os.environ.get("BRIGHTNESS", cfg.get("brightness", 0.9)))
+
+# contrast/color can be overridable too if you want
+contrast = float(os.environ.get("CONTRAST", cfg["contrast"]))
+color = float(os.environ.get("COLOR", cfg["color"]))
+
+virtual_framerate = int(os.environ.get("VIRTUAL_FRAMERATE", cfg["virtual_framerate"]))
+playlist_delay = int(os.environ.get("PLAYLIST_DELAY", cfg["playlist_delay"]))
+
+print(
+    "CONFIG_RESOLVED",
+    {
+        "CONFIG_FILE": CONFIG,
+        "PIXEL_WIDTH": pixel_width,
+        "PIXEL_HEIGHT": pixel_height,
+        "BRIGHTNESS": brightness,
+        "CONTRAST": contrast,
+        "COLOR": color,
+        "VIRTUAL_FRAMERATE": virtual_framerate,
+        "PLAYLIST_DELAY": playlist_delay,
+        "VIRTUAL_ENV": VIRTUAL_ENV,
+    },
+)
 
 try:
     # live env
