@@ -27,6 +27,55 @@ def get_current_effect():
     with effect_change_lock:
         return current_effect
 
+def effect_error():
+    """System fault / reset required."""
+    width = 16
+    height = 16
+
+    def draw_exclamation(color):
+        for y in range(3, 10):
+            matrix.pixel((7, y), color)
+            matrix.pixel((8, y), color)
+
+        for x, y in [(7, 12), (8, 12), (7, 13), (8, 13)]:
+            matrix.pixel((x, y), color)
+
+    def draw_border(color):
+        for x in range(width):
+            matrix.pixel((x, 0), color)
+            matrix.pixel((x, height - 1), color)
+        for y in range(height):
+            matrix.pixel((0, y), color)
+            matrix.pixel((width - 1, y), color)
+
+    while not stop_event.is_set() and get_current_effect() == 'error':
+        # Frame 1
+        matrix.reset()
+        draw_border((255, 0, 0))
+        draw_exclamation((255, 255, 255))
+        matrix.show()
+        matrix.delay(180)
+
+        if stop_event.is_set() or get_current_effect() != 'error':
+            break
+
+        # Frame 2
+        matrix.reset((255, 0, 0))
+        draw_exclamation((0, 0, 0))
+        matrix.show()
+        matrix.delay(180)
+
+        if stop_event.is_set() or get_current_effect() != 'error':
+            break
+
+        # Frame 3
+        matrix.reset()
+        draw_exclamation((255, 0, 0))
+        matrix.show()
+        matrix.delay(180)
+
+    print("Exiting error effect.")
+
 def effect_caution():
     """Red, yellow, repeat."""
     while not stop_event.is_set() and get_current_effect() == 'caution':
@@ -467,6 +516,7 @@ effects = {
     'lastLap': effect_lastLap,
     'off': effect_off,
     'startGateCountdown': effect_startGateCountdown,
+    'error': effect_error,
 }
 
 def apply_effect(effect_name):
