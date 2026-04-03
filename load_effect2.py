@@ -416,9 +416,6 @@ def effect_times(_initial_rider_data_ignored=None):
     160x16 scoreboard mode.
     If race timer is active, Lane 0 shows timer and riders occupy lanes 1..4.
     Otherwise riders occupy all 5 lanes.
-
-    Payload from Node for riders: "bike-#RIDERNUM-laps-lapTime"
-    Timer control comes via {"effect":"timer","startMs":<epoch_ms>|null,"label":"..."}.
     """
     def parse_quad(payload: str):
         parts = [p.strip() for p in payload.split('-')]
@@ -572,17 +569,18 @@ def render_start_gate_frame(payload: dict):
 
     # --- Mode: bigNumber ---
     if mode == "bigNumber":
-        label_font = safe_load_font(max(8, HEIGHT // 6))
-        value_font = safe_load_font(max(18, int(HEIGHT * 0.62)))
+        label_font = safe_load_font(max(10, int(HEIGHT * 0.18)))
+        value_font = safe_load_font(max(20, int(HEIGHT * 0.75)))
 
         if label:
-            draw_text_centered(draw, label, 1, label_font, (80, 160, 255), WIDTH)
+            draw_text_centered(draw, label, 2, label_font, (80, 160, 255), WIDTH)
 
         bbox = text_bbox(draw, value, value_font)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
         x = max(0, (WIDTH - text_w) // 2)
-        y = max(10, (HEIGHT - text_h) // 2 - 2)
+        y = max(0, (HEIGHT - text_h) // 2)
+
         draw.text((x, y), value, font=value_font, fill=(255, 255, 255))
         return frame
 
@@ -597,21 +595,17 @@ def render_start_gate_frame(payload: dict):
     else:
         timer_line = line2
 
-    # dynamic fonts for 48x48-ish canvas
-    header_font = safe_load_font(max(8, HEIGHT // 6))
-    timer_font = safe_load_font(max(14, int(HEIGHT * 0.34)))
-    footer_font = safe_load_font(max(8, HEIGHT // 7))
+    header_font = safe_load_font(max(10, int(HEIGHT * 0.18)))
+    timer_font = safe_load_font(max(20, int(HEIGHT * 0.65)))
+    footer_font = safe_load_font(max(8, int(HEIGHT * 0.16)))
 
-    # top line
-    draw_text_centered(draw, line1, 1, header_font, (80, 160, 255), WIDTH)
+    draw_text_centered(draw, line1, 2, header_font, (80, 160, 255), WIDTH)
 
-    # middle timer / main line
     bbox = text_bbox(draw, timer_line, timer_font)
     text_h = bbox[3] - bbox[1]
-    middle_y = max(12, (HEIGHT - text_h) // 2 - 2)
+    middle_y = (HEIGHT - text_h) // 2
     draw_text_centered(draw, timer_line, middle_y, timer_font, (255, 255, 255), WIDTH)
 
-    # lower lines
     if line3:
         draw_text_centered(draw, line3, HEIGHT - 18, footer_font, (0, 255, 0), WIDTH)
     if line4:
@@ -668,19 +662,19 @@ def effect_startGateCountdown(_payload=None):
     Scales to board size better than the old fixed 32x16 assumption.
     """
     width, height = pixel_width, pixel_height
-    label_font = safe_load_font(max(10, height // 2))
-    big_font = safe_load_font(max(18, int(height * 0.7)))
+    label_font = safe_load_font(max(10, int(height * 0.18)))
+    big_font = safe_load_font(max(20, int(height * 0.75)))
 
     def render_text_frame(top_text, big_text, big_color):
         image = Image.new("RGB", (width, height), (0, 0, 0))
         draw = ImageDraw.Draw(image)
 
         if top_text:
-            draw_text_centered(draw, top_text, 1, label_font, (80, 160, 255), width)
+            draw_text_centered(draw, top_text, 2, label_font, (80, 160, 255), width)
 
         bbox = text_bbox(draw, big_text, big_font)
         text_h = bbox[3] - bbox[1]
-        y = max(10, (height - text_h) // 2)
+        y = max(0, (height - text_h) // 2)
         draw_text_centered(draw, big_text, y, big_font, big_color, width)
         push_image_to_matrix(image)
 
@@ -752,13 +746,11 @@ effects = {
 def apply_effect(effect_name, payload=None):
     global stop_event, current_effect_thread
 
-    # Keep the existing scoreboard queue behavior
     if effect_name == 'times' and get_current_effect() == 'times' and current_effect_thread is not None and current_effect_thread.is_alive():
         if isinstance(payload, str) and payload:
             times_queue.put(payload)
         return
 
-    # If already in startGateDisplay, just replace payload by restarting cleanly.
     if current_effect_thread is not None:
         stop_event.set()
         current_effect_thread.join()
