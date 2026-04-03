@@ -250,6 +250,7 @@ class LiveMatrix():
         self.pixels = pixels()
         self.start_time = int(time.time())
 
+        print("PANEL_MODE:", os.environ.get("PANEL_MODE", "row_serp_tl"))
         print(
             "LIVE_MATRIX_INIT",
             {
