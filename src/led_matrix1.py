@@ -155,12 +155,41 @@ def get_tile_index(tile_col: int, tile_row: int) -> int:
     # fallback
     return tile_row * TILE_COLS + tile_col
 
+def transform_local_coords(local_x: int, local_y: int):
+    """
+    Rotate/flip coordinates INSIDE a single 16x16 tile before strip mapping.
+    Useful when tile placement is correct but each tile is rotated.
+    """
+    panel_rotation = os.environ.get("PANEL_ROTATION", "none").lower()
+
+    # no rotation
+    if panel_rotation == "none":
+        return local_x, local_y
+
+    # rotate logical image 90 CW before mapping
+    # use this if displayed output appears 90 CCW
+    if panel_rotation == "cw":
+        return (TILE_W - 1 - local_y), local_x
+
+    # rotate logical image 90 CCW before mapping
+    if panel_rotation == "ccw":
+        return local_y, (TILE_H - 1 - local_x)
+
+    # rotate 180
+    if panel_rotation == "180":
+        return (TILE_W - 1 - local_x), (TILE_H - 1 - local_y)
+
+    return local_x, local_y
+
 def logical_xy_to_strip_index(x: int, y: int) -> int:
     tile_col = x // TILE_W
     tile_row = y // TILE_H
 
     local_x = x % TILE_W
     local_y = y % TILE_H
+
+    # rotate inside each individual tile if needed
+    local_x, local_y = transform_local_coords(local_x, local_y)
 
     tile_index = get_tile_index(tile_col, tile_row)
 
@@ -306,6 +335,7 @@ class LiveMatrix():
         self.start_time = int(time.time())
 
         print("PANEL_MODE:", os.environ.get("PANEL_MODE", "row_serp_tl"))
+        print("PANEL_ROTATION:", os.environ.get("PANEL_ROTATION", "none"))
         print(
             "LIVE_MATRIX_INIT",
             {
