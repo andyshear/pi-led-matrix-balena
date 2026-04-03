@@ -129,6 +129,31 @@ def random_color():
 def ready(start_time):
     return (int(time.time()) - start_time) < playlist_delay
 
+def get_tile_index(tile_col: int, tile_row: int) -> int:
+    tile_order = os.environ.get("TILE_ORDER", "row-major").lower()
+
+    # 1 2 3 / 4 5 6 / 7 8 9
+    if tile_order == "row-major":
+        return tile_row * TILE_COLS + tile_col
+
+    # 1 2 3 / 6 5 4 / 7 8 9
+    if tile_order == "row-snake":
+        if tile_row % 2 == 0:
+            return tile_row * TILE_COLS + tile_col
+        return tile_row * TILE_COLS + (TILE_COLS - 1 - tile_col)
+
+    # 1 4 7 / 2 5 8 / 3 6 9
+    if tile_order == "col-major":
+        return tile_col * TILE_ROWS + tile_row
+
+    # 1 6 7 / 2 5 8 / 3 4 9 style vertical snake
+    if tile_order == "col-snake":
+        if tile_col % 2 == 0:
+            return tile_col * TILE_ROWS + tile_row
+        return tile_col * TILE_ROWS + (TILE_ROWS - 1 - tile_row)
+
+    # fallback
+    return tile_row * TILE_COLS + tile_col
 
 def logical_xy_to_strip_index(x: int, y: int) -> int:
     tile_col = x // TILE_W
@@ -137,41 +162,71 @@ def logical_xy_to_strip_index(x: int, y: int) -> int:
     local_x = x % TILE_W
     local_y = y % TILE_H
 
-    # tile chain order across the 3x3 front
-    tile_index = tile_row * TILE_COLS + tile_col
+    tile_index = get_tile_index(tile_col, tile_row)
 
     panel_mode = os.environ.get("PANEL_MODE", "row_serp_tl").lower()
 
-    # row_serp_tl = serpentine by row, starting top-left
+    # row serpentine, starts top-left
     if panel_mode == "row_serp_tl":
         if local_y % 2 == 0:
             local_index = local_y * TILE_W + local_x
         else:
             local_index = local_y * TILE_W + (TILE_W - 1 - local_x)
 
-    # row_serp_tr = serpentine by row, starting top-right
+    # row serpentine, starts top-right
     elif panel_mode == "row_serp_tr":
         if local_y % 2 == 0:
             local_index = local_y * TILE_W + (TILE_W - 1 - local_x)
         else:
             local_index = local_y * TILE_W + local_x
 
-    # col_serp_tl = serpentine by column, starting top-left
+    # row serpentine, starts bottom-left
+    elif panel_mode == "row_serp_bl":
+        flip_y = (TILE_H - 1 - local_y)
+        if flip_y % 2 == 0:
+            local_index = flip_y * TILE_W + local_x
+        else:
+            local_index = flip_y * TILE_W + (TILE_W - 1 - local_x)
+
+    # row serpentine, starts bottom-right
+    elif panel_mode == "row_serp_br":
+        flip_y = (TILE_H - 1 - local_y)
+        if flip_y % 2 == 0:
+            local_index = flip_y * TILE_W + (TILE_W - 1 - local_x)
+        else:
+            local_index = flip_y * TILE_W + local_x
+
+    # column serpentine, starts top-left
     elif panel_mode == "col_serp_tl":
         if local_x % 2 == 0:
             local_index = local_x * TILE_H + local_y
         else:
             local_index = local_x * TILE_H + (TILE_H - 1 - local_y)
 
-    # col_serp_bl = serpentine by column, starting bottom-left
+    # column serpentine, starts top-right
+    elif panel_mode == "col_serp_tr":
+        flip_x = (TILE_W - 1 - local_x)
+        if flip_x % 2 == 0:
+            local_index = flip_x * TILE_H + local_y
+        else:
+            local_index = flip_x * TILE_H + (TILE_H - 1 - local_y)
+
+    # column serpentine, starts bottom-left
     elif panel_mode == "col_serp_bl":
         if local_x % 2 == 0:
             local_index = local_x * TILE_H + (TILE_H - 1 - local_y)
         else:
             local_index = local_x * TILE_H + local_y
 
+    # column serpentine, starts bottom-right
+    elif panel_mode == "col_serp_br":
+        flip_x = (TILE_W - 1 - local_x)
+        if flip_x % 2 == 0:
+            local_index = flip_x * TILE_H + (TILE_H - 1 - local_y)
+        else:
+            local_index = flip_x * TILE_H + local_y
+
     else:
-        # fallback
         if local_y % 2 == 0:
             local_index = local_y * TILE_W + local_x
         else:
