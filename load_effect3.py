@@ -618,22 +618,29 @@ def render_start_gate_frame(payload: dict):
     draw = ImageDraw.Draw(frame)
 
     if mode == "bigNumber":
-        label_font = safe_load_font(max(10, int(height * 0.18)))
-        value_font = safe_load_font(max(20, int(height * 0.75)))
+        # Top label area: ~8px tall
+        # Big number area: remaining height below
+        label_font = safe_load_font(8)
+        value_font = safe_load_font(26)
+
+        top_margin = 1
+        label_h = 8
+        value_top = 10
 
         if label:
-            draw_text_centered(draw, label, 2, label_font, (80, 160, 255), width)
+            draw_text_centered(draw, label, top_margin, label_font, (255, 200, 80), width)
 
         bbox = text_bbox(draw, value, value_font)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
+
         x = max(0, (width - text_w) // 2)
-        y = max(0, (height - text_h) // 2)
+        y = value_top + max(0, ((height - value_top) - text_h) // 2) - 1
 
         draw.text((x, y), value, font=value_font, fill=(255, 255, 255))
         return frame
 
-    if show_timer and timer_start_ms is not None:
+        if show_timer and timer_start_ms is not None:
         try:
             elapsed_ms = max(0, now_ms - int(timer_start_ms))
         except Exception:
@@ -641,23 +648,32 @@ def render_start_gate_frame(payload: dict):
         total_s = elapsed_ms // 1000
         timer_line = f"{total_s // 60}:{total_s % 60:02d}"
     else:
-        timer_line = line2
+        timer_line = line2 or ""
 
-    header_font = safe_load_font(max(10, int(height * 0.18)))
-    timer_font = safe_load_font(max(20, int(height * 0.65)))
-    footer_font = safe_load_font(max(8, int(height * 0.16)))
+    # fixed bands for 48x48
+    header_font = safe_load_font(8)
+    timer_font = safe_load_font(20)
+    footer_font = safe_load_font(7)
 
-    draw_text_centered(draw, line1, 2, header_font, (80, 160, 255), width)
+    # header
+    if line1:
+        draw_text_centered(draw, line1[:10], 1, header_font, (255, 200, 80), width)
 
-    bbox = text_bbox(draw, timer_line, timer_font)
-    text_h = bbox[3] - bbox[1]
-    middle_y = (height - text_h) // 2
-    draw_text_centered(draw, timer_line, middle_y, timer_font, (255, 255, 255), width)
+    # timer centered in middle band
+    if timer_line:
+        bbox = text_bbox(draw, timer_line, timer_font)
+        text_h = bbox[3] - bbox[1]
+        middle_top = 12
+        middle_height = 24
+        middle_y = middle_top + max(0, (middle_height - text_h) // 2)
+        draw_text_centered(draw, timer_line, middle_y, timer_font, (255, 255, 255), width)
 
+    # bottom line: keep short and small
     if line3:
-        draw_text_centered(draw, line3, height - 18, footer_font, (0, 255, 0), width)
+        draw_text_centered(draw, line3[:10], 39, footer_font, (0, 255, 0), width)
+
     if line4:
-        draw_text_centered(draw, line4, height - 9, footer_font, (255, 255, 255), width)
+        draw_text_centered(draw, line4[:10], 31, footer_font, (80, 160, 255), width)
 
     return frame
 
