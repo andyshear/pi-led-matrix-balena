@@ -640,7 +640,7 @@ def render_start_gate_frame(payload: dict):
         draw.text((x, y), value, font=value_font, fill=(255, 255, 255))
         return frame
 
-        if show_timer and timer_start_ms is not None:
+    if show_timer and timer_start_ms is not None:
         try:
             elapsed_ms = max(0, now_ms - int(timer_start_ms))
         except Exception:
