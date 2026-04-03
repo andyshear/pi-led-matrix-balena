@@ -60,6 +60,19 @@ def safe_load_font(size: int):
             pass
     return ImageFont.load_default()
 
+def safe_load_mono_font(size: int):
+    candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationMono-Bold.ttf",
+    ]
+    for path in candidates:
+        try:
+            if os.path.exists(path):
+                return ImageFont.truetype(path, size)
+        except Exception:
+            pass
+    return safe_load_font(size)
 
 def text_bbox(draw, text, font):
     try:
@@ -617,29 +630,44 @@ def render_start_gate_frame(payload: dict):
     frame = Image.new("RGB", (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(frame)
 
+    # -----------------------------
+    # BIG NUMBER MODE
+    # -----------------------------
     if mode == "bigNumber":
-        # Top label area: ~8px tall
-        # Big number area: remaining height below
-        label_font = safe_load_font(8)
-        value_font = safe_load_font(26)
+        # Example:
+        # 250B
+        #   5
+        #
+        # Top band is just for the label.
+        # Rest of board belongs to the giant number.
 
-        top_margin = 1
-        label_h = 8
-        value_top = 10
+        label_text = label.replace(" ", "")[:6]
+        value_text = value[:3]
 
-        if label:
-            draw_text_centered(draw, label, top_margin, label_font, (255, 200, 80), width)
+        label_font = safe_load_font(12)
+        value_font = safe_load_mono_font(34)
 
-        bbox = text_bbox(draw, value, value_font)
+        # top banner
+        if label_text:
+            draw_text_centered(draw, label_text, 0, label_font, (80, 220, 255), width)
+
+        # giant centered number below banner
+        bbox = text_bbox(draw, value_text, value_font)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
 
+        # reserve top ~12 px for label area
+        value_top = 11
+        value_area_h = height - value_top
         x = max(0, (width - text_w) // 2)
-        y = value_top + max(0, ((height - value_top) - text_h) // 2) - 1
+        y = value_top + max(0, (value_area_h - text_h) // 2) - 1
 
-        draw.text((x, y), value, font=value_font, fill=(255, 255, 255))
+        draw.text((x, y), value_text, font=value_font, fill=(255, 255, 255))
         return frame
 
+    # -----------------------------
+    # RACE INFO / TIMER MODE
+    # -----------------------------
     if show_timer and timer_start_ms is not None:
         try:
             elapsed_ms = max(0, now_ms - int(timer_start_ms))
@@ -650,30 +678,38 @@ def render_start_gate_frame(payload: dict):
     else:
         timer_line = line2 or ""
 
-    # fixed bands for 48x48
-    header_font = safe_load_font(8)
-    timer_font = safe_load_font(20)
+    # Keep the top line compact for a 48x48 board
+    header_text = line1.replace(" ", "")[:8]
+    footer3 = line3.replace(" ", "")[:8]
+    footer4 = line4.replace(" ", "")[:8]
+
+    header_font = safe_load_font(9)
+    timer_font = safe_load_mono_font(24)
     footer_font = safe_load_font(7)
 
-    # header
-    if line1:
-        draw_text_centered(draw, line1[:10], 1, header_font, (255, 200, 80), width)
+    # Header band
+    if header_text:
+        draw_text_centered(draw, header_text, 1, header_font, (80, 220, 255), width)
 
-    # timer centered in middle band
+    # Middle timer band
     if timer_line:
         bbox = text_bbox(draw, timer_line, timer_font)
+        text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
+
         middle_top = 12
-        middle_height = 24
-        middle_y = middle_top + max(0, (middle_height - text_h) // 2)
-        draw_text_centered(draw, timer_line, middle_y, timer_font, (255, 255, 255), width)
+        middle_h = 24
+        x = max(0, (width - text_w) // 2)
+        y = middle_top + max(0, (middle_h - text_h) // 2) - 1
 
-    # bottom line: keep short and small
-    if line3:
-        draw_text_centered(draw, line3[:10], 39, footer_font, (0, 255, 0), width)
+        draw.text((x, y), timer_line, font=timer_font, fill=(255, 255, 255))
 
-    if line4:
-        draw_text_centered(draw, line4[:10], 31, footer_font, (80, 160, 255), width)
+    # Bottom helpers, only if used
+    if footer4:
+        draw_text_centered(draw, footer4, 32, footer_font, (180, 180, 255), width)
+
+    if footer3:
+        draw_text_centered(draw, footer3, 40, footer_font, (0, 255, 0), width)
 
     return frame
 
