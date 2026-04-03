@@ -634,33 +634,23 @@ def render_start_gate_frame(payload: dict):
     # BIG NUMBER MODE
     # -----------------------------
     if mode == "bigNumber":
-        # Example:
-        # 250B
-        #   5
-        #
-        # Top band is just for the label.
-        # Rest of board belongs to the giant number.
-
         label_text = label.replace(" ", "")[:6]
         value_text = value[:3]
 
         label_font = safe_load_font(12)
-        value_font = safe_load_mono_font(34)
+        value_font = safe_load_mono_font(40)
 
-        # top banner
         if label_text:
-            draw_text_centered(draw, label_text, 0, label_font, (80, 220, 255), width)
+            draw_text_centered(draw, label_text, 0, label_font, (255, 220, 80), width)
 
-        # giant centered number below banner
         bbox = text_bbox(draw, value_text, value_font)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
 
-        # reserve top ~12 px for label area
-        value_top = 11
-        value_area_h = height - value_top
+        # reserve small top band for label, let number dominate everything else
+        value_top = 10
         x = max(0, (width - text_w) // 2)
-        y = value_top + max(0, (value_area_h - text_h) // 2) - 1
+        y = value_top + max(0, ((height - value_top) - text_h) // 2) + 2
 
         draw.text((x, y), value_text, font=value_font, fill=(255, 255, 255))
         return frame
@@ -683,8 +673,8 @@ def render_start_gate_frame(payload: dict):
     footer3 = line3.replace(" ", "")[:8]
     footer4 = line4.replace(" ", "")[:8]
 
-    header_font = safe_load_font(9)
-    timer_font = safe_load_mono_font(24)
+    header_font = safe_load_font(10)
+    timer_font = safe_load_mono_font(22)
     footer_font = safe_load_font(7)
 
     # Header band
@@ -697,10 +687,10 @@ def render_start_gate_frame(payload: dict):
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
 
-        middle_top = 12
-        middle_h = 24
+        middle_top = 13
+        middle_h = 22
         x = max(0, (width - text_w) // 2)
-        y = middle_top + max(0, (middle_h - text_h) // 2) - 1
+        y = middle_top + max(0, (middle_h - text_h) // 2)
 
         draw.text((x, y), timer_line, font=timer_font, fill=(255, 255, 255))
 
