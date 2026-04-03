@@ -9,29 +9,29 @@ import queue
 from src.led_matrix import Matrix, pixel_height, pixel_width
 from PIL import Image, ImageDraw, ImageFont
 
-times_history = deque(maxlen=2)     # [(bike, name, time)]
-times_queue = queue.Queue()         # push rider payloads here
+times_history = deque(maxlen=2)
+times_queue = queue.Queue()
 
-laps_by_rider = {}                  # rider_name -> lap count
-_last_time_by_rider = {}            # rider_name -> last seen time (to avoid double-increment)
+laps_by_rider = {}
+_last_time_by_rider = {}
 
-# Initialize global variables for effect control
 current_effect = None
 effect_change_lock = threading.Lock()
 matrix = Matrix()
 stop_event = threading.Event()
 current_effect_thread = None
 
-# Define the delay for flashing and scrolling
-FLASH_DELAY = 500  # milliseconds
-SCROLL_DELAY = 20  # milliseconds
+FLASH_DELAY = 500
+SCROLL_DELAY = 20
 MESSAGE = "CAUTION"
 FONT_SIZE = 8
 FONT_PATH = "path/to/font.ttf"
 
-# ---- race timer state (shared across effects) ----
-race_timer_start_ms = None   # epoch ms or None when off
-race_timer_label = ""        # e.g. "M1" or "PRACT"
+race_timer_start_ms = None
+race_timer_label = ""
+
+PANEL_W = 16
+PANEL_H = 16
 
 
 def set_current_effect(effect):
@@ -46,9 +46,6 @@ def get_current_effect():
 
 
 def safe_load_font(size: int):
-    """
-    Try a few common fonts; fall back to PIL default.
-    """
     candidates = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -65,9 +62,6 @@ def safe_load_font(size: int):
 
 
 def text_bbox(draw, text, font):
-    """
-    PIL compatibility helper.
-    """
     try:
         return draw.textbbox((0, 0), text, font=font)
     except Exception:
@@ -99,7 +93,6 @@ def push_image_to_matrix(image):
 
 
 def effect_error(_payload=None):
-    """System fault / reset required."""
     width = 16
     height = 16
 
@@ -107,7 +100,6 @@ def effect_error(_payload=None):
         for y in range(3, 10):
             matrix.pixel((7, y), color)
             matrix.pixel((8, y), color)
-
         for x, y in [(7, 12), (8, 12), (7, 13), (8, 13)]:
             matrix.pixel((x, y), color)
 
@@ -146,7 +138,6 @@ def effect_error(_payload=None):
 
 
 def effect_caution(_payload=None):
-    """Red, yellow, repeat."""
     while not stop_event.is_set() and get_current_effect() == 'caution':
         matrix.reset(matrix.color('yellow'))
         width = 16
@@ -412,11 +403,6 @@ def handle_timer_cmd(payload: dict):
 
 
 def effect_times(_initial_rider_data_ignored=None):
-    """
-    160x16 scoreboard mode.
-    If race timer is active, Lane 0 shows timer and riders occupy lanes 1..4.
-    Otherwise riders occupy all 5 lanes.
-    """
     def parse_quad(payload: str):
         parts = [p.strip() for p in payload.split('-')]
         if len(parts) != 4:
@@ -546,12 +532,73 @@ def effect_times(_initial_rider_data_ignored=None):
         matrix.delay(IDLE_SLEEP_MS)
 
 
+def render_panel_test_frame(payload: dict):
+    """
+    Draw 1..9 centered in each 16x16 tile on a 48x48 board.
+    This is for physical mapping verification only.
+    """
+    width, height = pixel_width, pixel_height
+    frame = Image.new("RGB", (width, height), (0, 0, 0))
+    draw = ImageDraw.Draw(frame)
+
+    cols = max(1, width // PANEL_W)
+    rows = max(1, height // PANEL_H)
+
+    border_color = (25, 25, 25)
+    digit_colors = [
+        (255, 80, 80),
+        (80, 255, 80),
+        (80, 160, 255),
+        (255, 200, 80),
+        (255, 80, 255),
+        (80, 255, 255),
+        (255, 255, 255),
+        (180, 255, 120),
+        (255, 160, 160),
+    ]
+
+    tile_font = safe_load_font(14)
+
+    panel_num = 1
+    for row in range(rows):
+        for col in range(cols):
+            x0 = col * PANEL_W
+            y0 = row * PANEL_H
+            x1 = min(x0 + PANEL_W - 1, width - 1)
+            y1 = min(y0 + PANEL_H - 1, height - 1)
+
+            # tile border
+            draw.rectangle((x0, y0, x1, y1), outline=border_color)
+
+            label = str(panel_num)
+            color = digit_colors[(panel_num - 1) % len(digit_colors)]
+
+            bbox = text_bbox(draw, label, tile_font)
+            tw = bbox[2] - bbox[0]
+            th = bbox[3] - bbox[1]
+
+            tx = x0 + max(0, (PANEL_W - tw) // 2)
+            ty = y0 + max(0, (PANEL_H - th) // 2) - 1
+
+            draw.text((tx, ty), label, font=tile_font, fill=color)
+
+            panel_num += 1
+
+    # optional crosshair at board center
+    cx = width // 2
+    cy = height // 2
+    for dx in range(-1, 2):
+        if 0 <= cx + dx < width:
+            draw.point((cx + dx, cy), fill=(255, 255, 255))
+    for dy in range(-1, 2):
+        if 0 <= cy + dy < height:
+            draw.point((cx, cy + dy), fill=(255, 255, 255))
+
+    return frame
+
+
 def render_start_gate_frame(payload: dict):
-    """
-    Full-board renderer for the new start gate display.
-    Intended for 48x48 on the new 3x3 panel layout.
-    """
-    WIDTH, HEIGHT = pixel_width, pixel_height
+    width, height = pixel_width, pixel_height
     now_ms = int(time.time() * 1000)
 
     mode = str(payload.get("mode", "raceInfo") or "raceInfo")
@@ -564,27 +611,28 @@ def render_start_gate_frame(payload: dict):
     show_timer = bool(payload.get("showTimer", False))
     timer_start_ms = payload.get("timerStartMs", None)
 
-    frame = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
+    if mode == "panelTest":
+        return render_panel_test_frame(payload)
+
+    frame = Image.new("RGB", (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(frame)
 
-    # --- Mode: bigNumber ---
     if mode == "bigNumber":
-        label_font = safe_load_font(max(10, int(HEIGHT * 0.18)))
-        value_font = safe_load_font(max(20, int(HEIGHT * 0.75)))
+        label_font = safe_load_font(max(10, int(height * 0.18)))
+        value_font = safe_load_font(max(20, int(height * 0.75)))
 
         if label:
-            draw_text_centered(draw, label, 2, label_font, (80, 160, 255), WIDTH)
+            draw_text_centered(draw, label, 2, label_font, (80, 160, 255), width)
 
         bbox = text_bbox(draw, value, value_font)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
-        x = max(0, (WIDTH - text_w) // 2)
-        y = max(0, (HEIGHT - text_h) // 2)
+        x = max(0, (width - text_w) // 2)
+        y = max(0, (height - text_h) // 2)
 
         draw.text((x, y), value, font=value_font, fill=(255, 255, 255))
         return frame
 
-    # --- Mode: raceInfo ---
     if show_timer and timer_start_ms is not None:
         try:
             elapsed_ms = max(0, now_ms - int(timer_start_ms))
@@ -595,48 +643,26 @@ def render_start_gate_frame(payload: dict):
     else:
         timer_line = line2
 
-    header_font = safe_load_font(max(10, int(HEIGHT * 0.18)))
-    timer_font = safe_load_font(max(20, int(HEIGHT * 0.65)))
-    footer_font = safe_load_font(max(8, int(HEIGHT * 0.16)))
+    header_font = safe_load_font(max(10, int(height * 0.18)))
+    timer_font = safe_load_font(max(20, int(height * 0.65)))
+    footer_font = safe_load_font(max(8, int(height * 0.16)))
 
-    draw_text_centered(draw, line1, 2, header_font, (80, 160, 255), WIDTH)
+    draw_text_centered(draw, line1, 2, header_font, (80, 160, 255), width)
 
     bbox = text_bbox(draw, timer_line, timer_font)
     text_h = bbox[3] - bbox[1]
-    middle_y = (HEIGHT - text_h) // 2
-    draw_text_centered(draw, timer_line, middle_y, timer_font, (255, 255, 255), WIDTH)
+    middle_y = (height - text_h) // 2
+    draw_text_centered(draw, timer_line, middle_y, timer_font, (255, 255, 255), width)
 
     if line3:
-        draw_text_centered(draw, line3, HEIGHT - 18, footer_font, (0, 255, 0), WIDTH)
+        draw_text_centered(draw, line3, height - 18, footer_font, (0, 255, 0), width)
     if line4:
-        draw_text_centered(draw, line4, HEIGHT - 9, footer_font, (255, 255, 255), WIDTH)
+        draw_text_centered(draw, line4, height - 9, footer_font, (255, 255, 255), width)
 
     return frame
 
 
 def effect_startGateDisplay(initial_payload=None):
-    """
-    New full-canvas mode for the start gate display.
-    Supports:
-      {
-        "effect": "startGateDisplay",
-        "mode": "raceInfo",
-        "line1": "...",
-        "line2": "...",
-        "line3": "...",
-        "line4": "...",
-        "timerStartMs": 123,
-        "showTimer": true
-      }
-
-    Or:
-      {
-        "effect": "startGateDisplay",
-        "mode": "bigNumber",
-        "value": "5",
-        "label": "250B"
-      }
-    """
     payload = initial_payload if isinstance(initial_payload, dict) else {}
     last_render_key = None
 
@@ -657,10 +683,6 @@ def effect_startGateDisplay(initial_payload=None):
 
 
 def effect_startGateCountdown(_payload=None):
-    """
-    Display '30', then '5', then flash green 3 times, then turn off.
-    Scales to board size better than the old fixed 32x16 assumption.
-    """
     width, height = pixel_width, pixel_height
     label_font = safe_load_font(max(10, int(height * 0.18)))
     big_font = safe_load_font(max(20, int(height * 0.75)))
@@ -765,9 +787,6 @@ def apply_effect(effect_name, payload=None):
 
 
 def listen_for_commands():
-    """
-    Continuously listen for new commands and apply effects accordingly.
-    """
     while True:
         input_data = sys.stdin.readline().strip()
 
