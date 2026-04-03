@@ -22,49 +22,35 @@ playlist = cfg['playlist']
 VIRTUAL_ENV = False
 VIRTUAL_SIZE_MULTIPLIER = 10
 
-# size of matrix (allow balena env override)
 print("RAW_ENV PIXEL_WIDTH:", os.environ.get("PIXEL_WIDTH"))
 print("RAW_ENV PIXEL_HEIGHT:", os.environ.get("PIXEL_HEIGHT"))
-print("RAW_ENV MATRIX_ORIENTATION:", os.environ.get("MATRIX_ORIENTATION"))
 
 pixel_width = int(os.environ.get("PIXEL_WIDTH", cfg["pixel_width"]))
 pixel_height = int(os.environ.get("PIXEL_HEIGHT", cfg["pixel_height"]))
 
-# brightness 0 - 1 (allow balena env override)
 brightness = float(os.environ.get("BRIGHTNESS", cfg.get("brightness", 0.9)))
-
-# contrast/color can be overridable too if you want
 contrast = float(os.environ.get("CONTRAST", cfg["contrast"]))
 color = float(os.environ.get("COLOR", cfg["color"]))
 
 virtual_framerate = int(os.environ.get("VIRTUAL_FRAMERATE", cfg["virtual_framerate"]))
 playlist_delay = int(os.environ.get("PLAYLIST_DELAY", cfg["playlist_delay"]))
 
-try:
-    # live env
-    import board
-    import neopixel
-    from adafruit_pixel_framebuf import PixelFramebuffer, VERTICAL, HORIZONTAL
-except ImportError:
-    # virtual env
-    VIRTUAL_ENV = True
-    # placeholders so logging below still works
-    VERTICAL = "VERTICAL"
-    HORIZONTAL = "HORIZONTAL"
+# --- tiled board config ---
+TILE_W = int(os.environ.get("TILE_W", "16"))
+TILE_H = int(os.environ.get("TILE_H", "16"))
+TILE_COLS = int(os.environ.get("TILE_COLS", str(max(1, pixel_width // TILE_W))))
+TILE_ROWS = int(os.environ.get("TILE_ROWS", str(max(1, pixel_height // TILE_H))))
 
-# Orientation selection
-# Your physical wiring is:
+# Physical tile chain order:
 # 1 2 3
 # 4 5 6
 # 7 8 9
 #
-# That strongly suggests HORIZONTAL is the correct default.
-orientation_name = os.environ.get("MATRIX_ORIENTATION", "HORIZONTAL").upper()
-if orientation_name == "VERTICAL":
-    matrix_orientation = VERTICAL
-else:
-    matrix_orientation = HORIZONTAL
-    orientation_name = "HORIZONTAL"
+# This file assumes row-major tile order by default.
+TILE_ORDER = os.environ.get("TILE_ORDER", "row-major").lower()
+
+# Inside each tile, most 16x16 LED panels are serpentine by row.
+TILE_SERPENTINE = os.environ.get("TILE_SERPENTINE", "true").lower() == "true"
 
 print(
     "CONFIG_RESOLVED",
@@ -78,9 +64,20 @@ print(
         "VIRTUAL_FRAMERATE": virtual_framerate,
         "PLAYLIST_DELAY": playlist_delay,
         "VIRTUAL_ENV": VIRTUAL_ENV,
-        "MATRIX_ORIENTATION": orientation_name,
+        "TILE_W": TILE_W,
+        "TILE_H": TILE_H,
+        "TILE_COLS": TILE_COLS,
+        "TILE_ROWS": TILE_ROWS,
+        "TILE_ORDER": TILE_ORDER,
+        "TILE_SERPENTINE": TILE_SERPENTINE,
     },
 )
+
+try:
+    import board
+    import neopixel
+except ImportError:
+    VIRTUAL_ENV = True
 
 pixel_pin = board.D18 if not VIRTUAL_ENV else 0
 RGB = 'RGB'
@@ -130,9 +127,57 @@ def random_color():
 
 
 def ready(start_time):
-    if (int(time.time()) - start_time) < playlist_delay:
-        return True
-    return False
+    return (int(time.time()) - start_time) < playlist_delay
+
+
+def logical_xy_to_strip_index(x: int, y: int) -> int:
+    tile_col = x // TILE_W
+    tile_row = y // TILE_H
+
+    local_x = x % TILE_W
+    local_y = y % TILE_H
+
+    # tile chain order across the 3x3 front
+    tile_index = tile_row * TILE_COLS + tile_col
+
+    panel_mode = os.environ.get("PANEL_MODE", "row_serp_tl").lower()
+
+    # row_serp_tl = serpentine by row, starting top-left
+    if panel_mode == "row_serp_tl":
+        if local_y % 2 == 0:
+            local_index = local_y * TILE_W + local_x
+        else:
+            local_index = local_y * TILE_W + (TILE_W - 1 - local_x)
+
+    # row_serp_tr = serpentine by row, starting top-right
+    elif panel_mode == "row_serp_tr":
+        if local_y % 2 == 0:
+            local_index = local_y * TILE_W + (TILE_W - 1 - local_x)
+        else:
+            local_index = local_y * TILE_W + local_x
+
+    # col_serp_tl = serpentine by column, starting top-left
+    elif panel_mode == "col_serp_tl":
+        if local_x % 2 == 0:
+            local_index = local_x * TILE_H + local_y
+        else:
+            local_index = local_x * TILE_H + (TILE_H - 1 - local_y)
+
+    # col_serp_bl = serpentine by column, starting bottom-left
+    elif panel_mode == "col_serp_bl":
+        if local_x % 2 == 0:
+            local_index = local_x * TILE_H + (TILE_H - 1 - local_y)
+        else:
+            local_index = local_x * TILE_H + local_y
+
+    else:
+        # fallback
+        if local_y % 2 == 0:
+            local_index = local_y * TILE_W + local_x
+        else:
+            local_index = local_y * TILE_W + (TILE_W - 1 - local_x)
+
+    return tile_index * (TILE_W * TILE_H) + local_index
 
 
 class VirtualMatrix():
@@ -194,6 +239,7 @@ def pixels():
             pixel_width * pixel_height,
             brightness=brightness,
             auto_write=False,
+            pixel_order=neopixel.GRB,
         )
 
 
@@ -201,24 +247,23 @@ class LiveMatrix():
     def __init__(self):
         self.frame = []
         self.reset()
-        neopixel_pixels = pixels()
+        self.pixels = pixels()
+        self.start_time = int(time.time())
 
         print(
-            "PIXEL_FRAMEBUFFER_INIT",
+            "LIVE_MATRIX_INIT",
             {
                 "width": pixel_width,
                 "height": pixel_height,
-                "orientation": orientation_name,
+                "tile_w": TILE_W,
+                "tile_h": TILE_H,
+                "tile_cols": TILE_COLS,
+                "tile_rows": TILE_ROWS,
+                "tile_order": TILE_ORDER,
+                "tile_serpentine": TILE_SERPENTINE,
+                "num_pixels": pixel_width * pixel_height,
             },
         )
-
-        self.buff = PixelFramebuffer(
-            neopixel_pixels,
-            pixel_width,
-            pixel_height,
-            orientation=matrix_orientation
-        )
-        self.start_time = int(time.time())
 
     def ready(self):
         return ready(self.start_time)
@@ -255,15 +300,24 @@ class LiveMatrix():
         sprite(self, sprite_map, start, color_map)
 
     def show(self):
-        img = Image.fromarray(enhance(self.frame), mode=RGB)
-        self.buff.image(img)
-        self.buff.display()
+        enhanced = enhance(self.frame)
+
+        # enhanced frame is BGR because your pipeline stores [b, g, r]
+        # NeoPixel wants RGB tuples
+        for y in range(pixel_height):
+            for x in range(pixel_width):
+                b, g, r = enhanced[y, x]
+                idx = logical_xy_to_strip_index(x, y)
+                if 0 <= idx < len(self.pixels):
+                    self.pixels[idx] = (int(r), int(g), int(b))
+
+        self.pixels.show()
 
     def text(self, message, start, font_size, rgb_color, font='dosis.ttf'):
         text(self, message, start, font_size, rgb_color, font)
 
 
-def Matrix():  # pylint: disable=invalid-name
+def Matrix():
     if not VIRTUAL_ENV:
         return LiveMatrix()
     return VirtualMatrix()
