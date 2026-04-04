@@ -775,6 +775,114 @@ def render_start_gate_frame(payload: dict):
     frame = Image.new("RGB", (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(frame)
 
+    # -----------------------------
+    # BIG NUMBER MODE
+    # -----------------------------
+    if mode == "bigNumber":
+        label_text = label.replace(" ", "")[:6]
+        value_text = value[:3]
+
+        label_font = safe_load_font(10)
+        value_font = safe_load_font(38)
+
+        # top banner
+        if label_text:
+            draw_text_centered(draw, label_text, -1, label_font, (255, 220, 80), width)
+
+        bbox = text_bbox(draw, value_text, value_font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+
+        # only a tiny gap under the label
+        value_top = 5
+        value_area_h = height - value_top
+
+        x = max(0, (width - text_w) // 2)
+        y = value_top + max(0, (value_area_h - text_h) // 2) - 2
+
+        draw.text((x, y), value_text, font=value_font, fill=(255, 255, 255))
+        return frame
+
+    # -----------------------------
+    # RACE INFO / TIMER MODE
+    # -----------------------------
+    if show_timer and timer_start_ms is not None:
+        try:
+            elapsed_ms = max(0, now_ms - int(timer_start_ms))
+        except Exception:
+            elapsed_ms = 0
+        total_s = elapsed_ms // 1000
+        timer_line = f"{total_s // 60}:{total_s % 60:02d}"
+    else:
+        timer_line = line2 or ""
+
+    # Keep the top line compact for a 48x48 board
+    header_text = line1.strip()
+    footer3 = line3.replace(" ", "")[:8]
+    footer4 = line4.replace(" ", "")[:8]
+
+    header_font = safe_load_font(10)
+    timer_font = safe_load_mono_font(20)
+    footer_font = safe_load_font(7)
+
+    if header_text:
+        draw_text_marquee(
+            draw,
+            header_text,
+            0,
+            header_font,
+            (255, 220, 80),
+            width,
+            offset_x=marquee_offset_px(16),
+            gap=10,
+        )
+
+    if timer_line:
+        bbox = text_bbox(draw, timer_line, timer_font)
+        text_h = bbox[3] - bbox[1]
+
+        middle_top = 15
+        middle_h = 18
+        y = middle_top + max(0, (middle_h - text_h) // 2) - 1
+
+        draw_text_centered_fixed(
+            draw,
+            timer_line,
+            y,
+            timer_font,
+            (255, 255, 255),
+            width,
+            spacing=0
+        )
+
+    if footer4:
+        draw_text_centered(draw, footer4, 32, footer_font, (180, 180, 255), width)
+
+    if footer3:
+        draw_text_centered(draw, footer3, 40, footer_font, (0, 255, 0), width)
+
+    return frame
+
+def render_start_gate_frame1(payload: dict):
+    width, height = pixel_width, pixel_height
+    now_ms = int(time.time() * 1000)
+
+    mode = str(payload.get("mode", "raceInfo") or "raceInfo")
+    line1 = str(payload.get("line1", "") or "")
+    line2 = str(payload.get("line2", "") or "")
+    line3 = str(payload.get("line3", "") or "")
+    line4 = str(payload.get("line4", "") or "")
+    value = str(payload.get("value", "") or "")
+    label = str(payload.get("label", "") or "")
+    show_timer = bool(payload.get("showTimer", False))
+    timer_start_ms = payload.get("timerStartMs", None)
+
+    if mode == "panelTest":
+        return render_panel_test_frame(payload)
+
+    frame = Image.new("RGB", (width, height), (0, 0, 0))
+    draw = ImageDraw.Draw(frame)
+
     if mode == "panel7segTest":
         frame = Image.new("RGB", (width, height), (0, 0, 0))
         draw = ImageDraw.Draw(frame)
@@ -810,6 +918,35 @@ def render_start_gate_frame(payload: dict):
                     color=colors[n - 1],
                     x_offset=x0,
                 )
+                n += 1
+
+        return frame
+
+    if mode == "tileColorTest":
+        frame = Image.new("RGB", (width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(frame)
+
+        colors = [
+            (255, 0, 0),      # 1 red
+            (0, 255, 0),      # 2 green
+            (0, 0, 255),      # 3 blue
+            (255, 255, 0),    # 4 yellow
+            (255, 0, 255),    # 5 magenta
+            (0, 255, 255),    # 6 cyan
+            (255, 255, 255),  # 7 white
+            (255, 128, 0),    # 8 orange
+            (128, 128, 255),  # 9 lavender
+        ]
+
+        n = 0
+        for row in range(3):
+            for col in range(3):
+                x0 = col * 16
+                y0 = row * 16
+                x1 = x0 + 15
+                y1 = y0 + 15
+
+                draw.rectangle((x0, y0, x1, y1), fill=colors[n], outline=(20, 20, 20))
                 n += 1
 
         return frame
