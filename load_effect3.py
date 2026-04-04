@@ -89,7 +89,7 @@ def draw_text_centered(draw, text, y, font, fill, width):
     x = max(0, (width - text_w) // 2)
     draw.text((x, y), text, font=font, fill=fill)
 
-def marquee_offset_px(speed_px_per_sec=45):
+def marquee_offset_px(speed_px_per_sec=20):
     now_ms = int(time.time() * 1000)
     return round((now_ms / 1000.0) * speed_px_per_sec)
 
@@ -707,8 +707,8 @@ def render_start_gate_frame(payload: dict):
                 label_font,
                 (255, 220, 80),
                 width,
-                offset_x=marquee_offset_px(45),
-                gap=6,
+                offset_x=marquee_offset_px(20),
+                gap=8,
             )
 
         bbox = text_bbox(draw, value_text, value_font)
@@ -754,8 +754,8 @@ def render_start_gate_frame(payload: dict):
             header_font,
             (255, 220, 80),
             width,
-            offset_x=marquee_offset_px(45),
-            gap=6,
+            offset_x=marquee_offset_px(20),
+            gap=8,
         )
 
     if timer_line:
@@ -793,7 +793,7 @@ def effect_startGateDisplay(initial_payload=None):
         push_image_to_matrix(frame)
 
         # ~30 FPS for smooth marquee / animation
-        matrix.delay(33)
+        matrix.delay(20)
 
 
 def effect_startGateCountdown(_payload=None):
