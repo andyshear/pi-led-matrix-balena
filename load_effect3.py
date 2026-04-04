@@ -148,93 +148,6 @@ def draw_text_centered_fixed(draw, text, y, font, fill, width, spacing=1):
         draw.text((x, y), ch, font=font, fill=fill)
         x += char_widths[i] + spacing
 
-SEGMENTS = {
-    "0": ("a", "b", "c", "d", "e", "f"),
-    "1": ("b", "c"),
-    "2": ("a", "b", "g", "e", "d"),
-    "3": ("a", "b", "g", "c", "d"),
-    "4": ("f", "g", "b", "c"),
-    "5": ("a", "f", "g", "c", "d"),
-    "6": ("a", "f", "g", "e", "c", "d"),
-    "7": ("a", "b", "c"),
-    "8": ("a", "b", "c", "d", "e", "f", "g"),
-    "9": ("a", "b", "c", "d", "f", "g"),
-}
-
-def draw_rect(draw, x, y, w, h, fill):
-    draw.rectangle((x, y, x + w - 1, y + h - 1), fill=fill)
-
-def draw_7seg_digit(draw, x, y, digit, scale=1, color=(255, 255, 255)):
-    if digit not in SEGMENTS:
-        return 8 * scale
-
-    t = max(1, scale)
-    w = 6 * scale
-    h = 10 * scale
-
-    seg = {
-        "a": (x + t,         y,             w, t),
-        "b": (x + t + w,     y + t,         t, h // 2 - t),
-        "c": (x + t + w,     y + h // 2,    t, h // 2 - t),
-        "d": (x + t,         y + h,         w, t),
-        "e": (x,             y + h // 2,    t, h // 2 - t),
-        "f": (x,             y + t,         t, h // 2 - t),
-        "g": (x + t,         y + h // 2,    w, t),
-    }
-
-    for s in SEGMENTS[digit]:
-        sx, sy, sw, sh = seg[s]
-        draw_rect(draw, sx, sy, sw, sh, color)
-
-    return (w + 2 * t) + scale
-
-def draw_colon_7seg(draw, x, y, scale=1, color=(255, 255, 255)):
-    dot = max(1, scale + 1)
-    draw_rect(draw, x, y + 4 * scale, dot, dot, color)
-    draw_rect(draw, x, y + 9 * scale, dot, dot, color)
-    return dot + scale + 1
-
-def measure_7seg_text(text, scale=1):
-    total = 0
-    for ch in text:
-        if ch.isdigit():
-            total += (6 * scale + 2 * scale) + scale
-        elif ch == ":":
-            total += max(1, scale + 1) + scale + 1
-        else:
-            total += 4 * scale
-    return total
-
-def draw_7seg_text_centered(draw, text, y, width, scale=1, color=(255, 255, 255), x_offset=0):
-    total_w = measure_7seg_text(text, scale)
-    x = x_offset + max(0, (width - total_w) // 2)
-
-    for ch in text:
-        if ch.isdigit():
-            x += draw_7seg_digit(draw, x, y, ch, scale=scale, color=color)
-        elif ch == ":":
-            x += draw_colon_7seg(draw, x, y, scale=scale, color=color)
-        else:
-            x += 4 * scale
-
-
-def draw_big_digit_centered(draw, digit, width, height, y_top=9, color=(255, 255, 255)):
-    """
-    Draw one large centered digit for the countdown / gate number.
-    Tuned for a 48x48 board.
-    """
-    if not digit or not digit[0].isdigit():
-        return
-
-    ch = digit[0]
-
-    # Larger than timer, but only for ONE digit
-    scale = 3
-
-    digit_w = (6 * scale + 2 * scale) + scale
-    x = max(0, (width - digit_w) // 2)
-
-    draw_7seg_digit(draw, x, y_top, ch, scale=scale, color=color)
 
 def draw_text_left(draw, text, x, y, font, fill):
     if not text:
@@ -783,11 +696,20 @@ def render_start_gate_frame(payload: dict):
         value_text = value[:3]
 
         label_font = safe_load_font(10)
-        value_font = safe_load_font(38)
+        value_font = safe_load_font(36)
 
         # top banner
         if label_text:
-            draw_text_centered(draw, label_text, -1, label_font, (255, 220, 80), width)
+            draw_text_marquee(
+                draw,
+                label_text,
+                -1,
+                label_font,
+                (255, 220, 80),
+                width,
+                offset_x=marquee_offset_px(16),
+                gap=10,
+            )
 
         bbox = text_bbox(draw, value_text, value_font)
         text_w = bbox[2] - bbox[0]
@@ -822,7 +744,7 @@ def render_start_gate_frame(payload: dict):
     footer4 = line4.replace(" ", "")[:8]
 
     header_font = safe_load_font(10)
-    timer_font = safe_load_mono_font(20)
+    timer_font = safe_load_mono_font(18)
     footer_font = safe_load_font(7)
 
     if header_text:
@@ -853,168 +775,6 @@ def render_start_gate_frame(payload: dict):
             (255, 255, 255),
             width,
             spacing=0
-        )
-
-    if footer4:
-        draw_text_centered(draw, footer4, 32, footer_font, (180, 180, 255), width)
-
-    if footer3:
-        draw_text_centered(draw, footer3, 40, footer_font, (0, 255, 0), width)
-
-    return frame
-
-def render_start_gate_frame1(payload: dict):
-    width, height = pixel_width, pixel_height
-    now_ms = int(time.time() * 1000)
-
-    mode = str(payload.get("mode", "raceInfo") or "raceInfo")
-    line1 = str(payload.get("line1", "") or "")
-    line2 = str(payload.get("line2", "") or "")
-    line3 = str(payload.get("line3", "") or "")
-    line4 = str(payload.get("line4", "") or "")
-    value = str(payload.get("value", "") or "")
-    label = str(payload.get("label", "") or "")
-    show_timer = bool(payload.get("showTimer", False))
-    timer_start_ms = payload.get("timerStartMs", None)
-
-    if mode == "panelTest":
-        return render_panel_test_frame(payload)
-
-    frame = Image.new("RGB", (width, height), (0, 0, 0))
-    draw = ImageDraw.Draw(frame)
-
-    if mode == "panel7segTest":
-        frame = Image.new("RGB", (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(frame)
-
-        border_color = (35, 35, 35)
-        colors = [
-            (80, 160, 255),
-            (80, 255, 80),
-            (255, 200, 80),
-            (255, 255, 0),
-            (255, 80, 255),
-            (80, 255, 255),
-            (255, 255, 255),
-            (180, 255, 120),
-            (200, 200, 255),
-        ]
-
-        n = 1
-        for row in range(3):
-            for col in range(3):
-                x0 = col * 16
-                y0 = row * 16
-                x1 = x0 + 15
-                y1 = y0 + 15
-                draw.rectangle((x0, y0, x1, y1), outline=border_color)
-
-                draw_7seg_text_centered(
-                    draw,
-                    str(n),
-                    y=y0 + 2,
-                    width=16,
-                    scale=1,
-                    color=colors[n - 1],
-                    x_offset=x0,
-                )
-                n += 1
-
-        return frame
-
-    if mode == "tileColorTest":
-        frame = Image.new("RGB", (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(frame)
-
-        colors = [
-            (255, 0, 0),      # 1 red
-            (0, 255, 0),      # 2 green
-            (0, 0, 255),      # 3 blue
-            (255, 255, 0),    # 4 yellow
-            (255, 0, 255),    # 5 magenta
-            (0, 255, 255),    # 6 cyan
-            (255, 255, 255),  # 7 white
-            (255, 128, 0),    # 8 orange
-            (128, 128, 255),  # 9 lavender
-        ]
-
-        n = 0
-        for row in range(3):
-            for col in range(3):
-                x0 = col * 16
-                y0 = row * 16
-                x1 = x0 + 15
-                y1 = y0 + 15
-
-                draw.rectangle((x0, y0, x1, y1), fill=colors[n], outline=(20, 20, 20))
-                n += 1
-
-        return frame
-
-    # -----------------------------
-    # BIG NUMBER MODE
-    # -----------------------------
-    if mode == "bigNumber":
-        label_text = label.replace(" ", "")[:6]
-        value_text = value[:2]
-
-        label_font = safe_load_font(10)
-
-        if label_text:
-            draw_text_centered(draw, label_text, 0, label_font, (255, 220, 80), width)
-
-        draw_big_digit_centered(
-            draw,
-            value_text,
-            width=width,
-            height=height,
-            y_top=10,
-            color=(255, 255, 255),
-        )
-        return frame
-
-    # -----------------------------
-    # RACE INFO / TIMER MODE
-    # -----------------------------
-    if show_timer and timer_start_ms is not None:
-        try:
-            elapsed_ms = max(0, now_ms - int(timer_start_ms))
-        except Exception:
-            elapsed_ms = 0
-        total_s = elapsed_ms // 1000
-        timer_line = f"{total_s // 60}:{total_s % 60:02d}"
-    else:
-        timer_line = line2 or ""
-
-    # Keep the top line compact for a 48x48 board
-    header_text = line1.strip()
-    footer3 = line3.replace(" ", "")[:8]
-    footer4 = line4.replace(" ", "")[:8]
-
-    header_font = safe_load_font(10)
-    timer_font = safe_load_mono_font(20)
-    footer_font = safe_load_font(7)
-
-    if header_text:
-        draw_text_marquee(
-            draw,
-            header_text,
-            0,
-            header_font,
-            (255, 220, 80),
-            width,
-            offset_x=marquee_offset_px(16),
-            gap=10,
-        )
-
-    if timer_line:
-        draw_7seg_text_centered(
-            draw,
-            timer_line,
-            y=20,
-            width=width,
-            scale=1,
-            color=(255, 255, 255),
         )
 
     if footer4:
