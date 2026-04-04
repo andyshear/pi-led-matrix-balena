@@ -158,6 +158,9 @@ ICON_MAP = {
 }
 
 def render_icon_frame(payload: dict):
+    if hasattr(matrix, "set_enhance"):
+        matrix.set_enhance(False)
+
     width, height = pixel_width, pixel_height
     icon_key = str(payload.get("icon", "") or "").lower()
 
@@ -791,7 +794,12 @@ def render_start_gate_frame(payload: dict):
         return render_panel_test_frame(payload)
 
     if mode == "icon":
+        if hasattr(matrix, "set_enhance"):
+            matrix.set_enhance(False)
         return render_icon_frame(payload)
+    
+    if hasattr(matrix, "set_enhance"):
+        matrix.set_enhance(True)
 
     frame = Image.new("RGB", (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(frame)
