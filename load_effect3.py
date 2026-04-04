@@ -190,10 +190,10 @@ def load_icon_image(path, width, height):
                     continue
 
                 # near-white -> transparent
-                # if r > 235 and g > 235 and b > 235:
-                #     px[x, y] = (0, 0, 0, 0)
-                if r > 220 and g > 220 and b > 220:
+                if r > 235 and g > 235 and b > 235:
                     px[x, y] = (0, 0, 0, 0)
+                # if r > 220 and g > 220 and b > 220:
+                #     px[x, y] = (0, 0, 0, 0)
 
         # fit inside board with a little margin
         target_w = max(1, width - 4)
