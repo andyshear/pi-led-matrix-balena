@@ -209,6 +209,9 @@ def load_icon_image(path, width, height):
         rgb = ImageEnhance.Color(rgb).enhance(1.30)
         rgb = ImageEnhance.Contrast(rgb).enhance(1.15)
         rgb = rgb.filter(ImageFilter.SHARPEN)
+        # rgb = ImageEnhance.Color(rgb).enhance(1.18)
+        # rgb = ImageEnhance.Contrast(rgb).enhance(1.08)
+        # rgb = rgb.filter(ImageFilter.SHARPEN)
 
         palette = Image.new("P", (1, 1))
         palette.putpalette([
@@ -221,12 +224,12 @@ def load_icon_image(path, width, height):
             255, 120, 0,     # orange
         ] + [0, 0, 0] * 249)
 
-        rgb = rgb.quantize(palette=palette, dither=Image.Dither.NONE).convert("RGB")
+        # rgb = rgb.quantize(palette=palette, dither=Image.Dither.NONE).convert("RGB")
 
 
-        rgb = np.array(rgb)
-        rgb[rgb > 240] = 240
-        rgb = Image.fromarray(rgb)
+        # rgb = np.array(rgb)
+        # rgb[rgb > 240] = 240
+        # rgb = Image.fromarray(rgb)
         # optional second sharpen for super simple logos only
         # rgb = rgb.filter(ImageFilter.SHARPEN)
 
