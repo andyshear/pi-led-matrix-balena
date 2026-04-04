@@ -205,9 +205,9 @@ def measure_7seg_text(text, scale=1):
             total += 4 * scale
     return total
 
-def draw_7seg_text_centered(draw, text, y, width, scale=1, color=(255, 255, 255)):
+def draw_7seg_text_centered(draw, text, y, width, scale=1, color=(255, 255, 255), x_offset=0):
     total_w = measure_7seg_text(text, scale)
-    x = max(0, (width - total_w) // 2)
+    x = x_offset + max(0, (width - total_w) // 2)
 
     for ch in text:
         if ch.isdigit():
@@ -774,6 +774,45 @@ def render_start_gate_frame(payload: dict):
 
     frame = Image.new("RGB", (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(frame)
+
+    if mode == "panel7segTest":
+        frame = Image.new("RGB", (width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(frame)
+
+        border_color = (35, 35, 35)
+        colors = [
+            (80, 160, 255),
+            (80, 255, 80),
+            (255, 200, 80),
+            (255, 255, 0),
+            (255, 80, 255),
+            (80, 255, 255),
+            (255, 255, 255),
+            (180, 255, 120),
+            (200, 200, 255),
+        ]
+
+        n = 1
+        for row in range(3):
+            for col in range(3):
+                x0 = col * 16
+                y0 = row * 16
+                x1 = x0 + 15
+                y1 = y0 + 15
+                draw.rectangle((x0, y0, x1, y1), outline=border_color)
+
+                draw_7seg_text_centered(
+                    draw,
+                    str(n),
+                    y=y0 + 2,
+                    width=16,
+                    scale=1,
+                    color=colors[n - 1],
+                    x_offset=x0,
+                )
+                n += 1
+
+        return frame
 
     # -----------------------------
     # BIG NUMBER MODE
