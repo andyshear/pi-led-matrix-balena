@@ -153,7 +153,7 @@ def draw_text_centered_fixed(draw, text, y, font, fill, width, spacing=1):
 ICON_MAP = {
     "aztec": os.path.join(BASE_DIR, "assets", "icons", "aztec.png"),
     "suika": os.path.join(BASE_DIR, "assets", "icons", "suika.png"),
-    "mananaranch": os.path.join(BASE_DIR, "assets", "icons", "mananaranch.png"),
+    "manana": os.path.join(BASE_DIR, "assets", "icons", "manana.png"),
     "icon": os.path.join(BASE_DIR, "assets", "icons", "logo.png"),
 }
 
@@ -258,7 +258,8 @@ def push_image_to_matrix(image):
     width, height = image.size
     for x in range(width):
         for y in range(height):
-            matrix.pixel((x, y), image.getpixel((x, y)))
+            r, g, b = image.getpixel((x, y))
+            matrix.pixel((x, y), (b, g, r))
     matrix.show()
 
 def effect_icon(initial_payload=None):
