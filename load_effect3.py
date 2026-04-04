@@ -111,6 +111,81 @@ def draw_text_centered_fixed(draw, text, y, font, fill, width, spacing=1):
         draw.text((x, y), ch, font=font, fill=fill)
         x += char_widths[i] + spacing
 
+SEGMENTS = {
+    "0": ("a", "b", "c", "d", "e", "f"),
+    "1": ("b", "c"),
+    "2": ("a", "b", "g", "e", "d"),
+    "3": ("a", "b", "g", "c", "d"),
+    "4": ("f", "g", "b", "c"),
+    "5": ("a", "f", "g", "c", "d"),
+    "6": ("a", "f", "g", "e", "c", "d"),
+    "7": ("a", "b", "c"),
+    "8": ("a", "b", "c", "d", "e", "f", "g"),
+    "9": ("a", "b", "c", "d", "f", "g"),
+}
+
+def draw_rect(draw, x, y, w, h, fill):
+    draw.rectangle((x, y, x + w - 1, y + h - 1), fill=fill)
+
+def draw_7seg_digit(draw, x, y, digit, scale=1, color=(255, 255, 255)):
+    """
+    Classic 7-segment digit.
+    Base size at scale=1 is about 8w x 14h.
+    """
+    if digit not in SEGMENTS:
+        return 8 * scale
+
+    t = max(1, scale)              # thickness
+    w = 6 * scale                  # inner width
+    h = 10 * scale                 # inner height
+
+    seg = {
+        "a": (x + t,         y,             w, t),
+        "b": (x + t + w,     y + t,         t, h // 2 - t),
+        "c": (x + t + w,     y + h // 2,    t, h // 2 - t),
+        "d": (x + t,         y + h,         w, t),
+        "e": (x,             y + h // 2,    t, h // 2 - t),
+        "f": (x,             y + t,         t, h // 2 - t),
+        "g": (x + t,         y + h // 2,    w, t),
+    }
+
+    for s in SEGMENTS[digit]:
+        sx, sy, sw, sh = seg[s]
+        draw_rect(draw, sx, sy, sw, sh, color)
+
+    return (w + 2 * t) + scale  # width incl gap
+
+
+def draw_colon_7seg(draw, x, y, scale=1, color=(255, 255, 255)):
+    dot = max(1, scale + 1)
+    draw_rect(draw, x, y + 4 * scale, dot, dot, color)
+    draw_rect(draw, x, y + 9 * scale, dot, dot, color)
+    return dot + scale + 1
+
+
+def measure_7seg_text(text, scale=1):
+    total = 0
+    for ch in text:
+        if ch.isdigit():
+            total += (6 * scale + 2 * scale) + scale
+        elif ch == ":":
+            total += max(1, scale + 1) + scale + 1
+        else:
+            total += 4 * scale
+    return total
+
+
+def draw_7seg_text_centered(draw, text, y, width, scale=1, color=(255, 255, 255)):
+    total_w = measure_7seg_text(text, scale)
+    x = max(0, (width - total_w) // 2)
+
+    for ch in text:
+        if ch.isdigit():
+            x += draw_7seg_digit(draw, x, y, ch, scale=scale, color=color)
+        elif ch == ":":
+            x += draw_colon_7seg(draw, x, y, scale=scale, color=color)
+        else:
+            x += 4 * scale
 
 def draw_text_left(draw, text, x, y, font, fill):
     if not text:
@@ -656,27 +731,23 @@ def render_start_gate_frame(payload: dict):
     # -----------------------------
     if mode == "bigNumber":
         label_text = label.replace(" ", "")[:6]
-        value_text = value[:3]
+        value_text = value[:2]
 
         label_font = safe_load_font(11)
-        value_font = safe_load_font(44)
 
-        # top banner
         if label_text:
-            draw_text_centered(draw, label_text, -1, label_font, (255, 220, 80), width)
+            draw_text_centered(draw, label_text, 0, label_font, (80, 220, 255), width)
 
-        bbox = text_bbox(draw, value_text, value_font)
-        text_w = bbox[2] - bbox[0]
-        text_h = bbox[3] - bbox[1]
-
-        # only a tiny gap under the label
-        value_top = 5
-        value_area_h = height - value_top
-
-        x = max(0, (width - text_w) // 2)
-        y = value_top + max(0, (value_area_h - text_h) // 2) - 2
-
-        draw.text((x, y), value_text, font=value_font, fill=(255, 255, 255))
+        # Giant 7-seg number
+        # scale 3 fits nicely on 48x48 and looks much cleaner than TTF
+        draw_7seg_text_centered(
+            draw,
+            value_text,
+            y=12,          # very tight under label
+            width=width,
+            scale=3,
+            color=(255, 255, 255),
+        )
         return frame
 
     # -----------------------------
@@ -698,28 +769,19 @@ def render_start_gate_frame(payload: dict):
     footer4 = line4.replace(" ", "")[:8]
 
     header_font = safe_load_font(10)
-    timer_font = safe_load_mono_font(20)
     footer_font = safe_load_font(7)
 
     if header_text:
-        draw_text_centered(draw, header_text, 0, header_font, (80, 220, 255), width)
+        draw_text_centered(draw, header_text, 0, header_font, (255, 220, 80), width)
 
     if timer_line:
-        bbox = text_bbox(draw, timer_line, timer_font)
-        text_h = bbox[3] - bbox[1]
-
-        middle_top = 15
-        middle_h = 18
-        y = middle_top + max(0, (middle_h - text_h) // 2) - 1
-
-        draw_text_centered_fixed(
+        draw_7seg_text_centered(
             draw,
             timer_line,
-            y,
-            timer_font,
-            (255, 255, 255),
-            width,
-            spacing=0
+            y=16,
+            width=width,
+            scale=2,
+            color=(255, 255, 255),
         )
 
     if footer4:
