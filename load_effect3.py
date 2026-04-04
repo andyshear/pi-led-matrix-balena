@@ -148,6 +148,47 @@ def draw_text_centered_fixed(draw, text, y, font, fill, width, spacing=1):
         draw.text((x, y), ch, font=font, fill=fill)
         x += char_widths[i] + spacing
 
+ICON_MAP = {
+    "aztec": "/assets/icons/aztec.png",
+    "suika": "/assets/icons/suika.png",
+    "mananaRanch": "/assets/icons/mananaRanch.png",
+    "icon": "/assets/icons/icon.png",
+}
+
+def render_icon_frame(payload: dict):
+    width, height = pixel_width, pixel_height
+
+    icon_key = str(payload.get("icon", "")).lower()
+
+    path = ICON_MAP.get(icon_key)
+
+    if not path:
+        print(f"[icon] unknown icon: {icon_key}")
+        return Image.new("RGB", (width, height), (0, 0, 0))
+
+    return load_icon_image(path, width, height)
+
+def load_icon_image(path, width, height):
+    try:
+        img = Image.open(path).convert("RGBA")
+
+        # Maintain aspect ratio + center
+        img.thumbnail((width, height), Image.Resampling.LANCZOS)
+
+        canvas = Image.new("RGB", (width, height), (0, 0, 0))
+
+        x = (width - img.width) // 2
+        y = (height - img.height) // 2
+
+        img = ImageEnhance.Brightness(img).enhance(1.3)
+        img = img.filter(ImageFilter.SHARPEN)
+
+        canvas.paste(img, (x, y), img)
+
+        return canvas
+    except Exception as e:
+        print(f"[icon] failed to load {path}: {e}")
+        return Image.new("RGB", (width, height), (0, 0, 0))
 
 def draw_text_left(draw, text, x, y, font, fill):
     if not text:
@@ -161,6 +202,15 @@ def push_image_to_matrix(image):
         for y in range(height):
             matrix.pixel((x, y), image.getpixel((x, y)))
     matrix.show()
+
+def effect_icon(initial_payload=None):
+    payload = initial_payload if isinstance(initial_payload, dict) else {}
+
+    while not stop_event.is_set() and get_current_effect() == 'icon':
+        frame = render_icon_frame(payload)
+        push_image_to_matrix(frame)
+
+        matrix.delay(16)  # smooth like your other display
 
 
 def effect_error(_payload=None):
@@ -875,6 +925,7 @@ effects = {
     'timer': handle_timer_cmd,
     'startGateCountdown': effect_startGateCountdown,
     'startGateDisplay': effect_startGateDisplay,
+    'icon': effect_icon,
     'error': effect_error,
 }
 
@@ -916,6 +967,10 @@ def listen_for_commands():
                 continue
 
             if effect_name == "startGateDisplay":
+                apply_effect(effect_name, data)
+                continue
+
+            if effect_name == "icon":
                 apply_effect(effect_name, data)
                 continue
 
