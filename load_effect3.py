@@ -81,6 +81,13 @@ def text_bbox(draw, text, font):
         w, h = draw.textsize(text, font=font)
         return (0, 0, w, h)
 
+def draw_text_centered(draw, text, y, font, fill, width):
+    if not text:
+        return
+    bbox = text_bbox(draw, text, font)
+    text_w = bbox[2] - bbox[0]
+    x = max(0, (width - text_w) // 2)
+    draw.text((x, y), text, font=font, fill=fill)
 
 def draw_text_centered_fixed(draw, text, y, font, fill, width, spacing=1):
     if not text:
