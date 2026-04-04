@@ -206,12 +206,12 @@ def load_icon_image(path, width, height):
 
         # rgb = ImageEnhance.Color(rgb).enhance(1.20)
         # rgb = ImageEnhance.Contrast(rgb).enhance(1.10)
-        rgb = ImageEnhance.Color(rgb).enhance(1.30)
-        rgb = ImageEnhance.Contrast(rgb).enhance(1.15)
-        rgb = rgb.filter(ImageFilter.SHARPEN)
-        # rgb = ImageEnhance.Color(rgb).enhance(1.18)
-        # rgb = ImageEnhance.Contrast(rgb).enhance(1.08)
+        # rgb = ImageEnhance.Color(rgb).enhance(1.30)
+        # rgb = ImageEnhance.Contrast(rgb).enhance(1.15)
         # rgb = rgb.filter(ImageFilter.SHARPEN)
+        rgb = ImageEnhance.Color(rgb).enhance(1.18)
+        rgb = ImageEnhance.Contrast(rgb).enhance(1.08)
+        rgb = rgb.filter(ImageFilter.SHARPEN)
 
         palette = Image.new("P", (1, 1))
         palette.putpalette([
