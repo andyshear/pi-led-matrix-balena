@@ -224,7 +224,7 @@ def load_icon_image(path, width, height):
             255, 120, 0,     # orange
         ] + [0, 0, 0] * 249)
 
-        rgb = rgb.quantize(palette=palette, dither=Image.Dither.NONE).convert("RGB")
+        # rgb = rgb.quantize(palette=palette, dither=Image.Dither.NONE).convert("RGB")
 
 
         # rgb = np.array(rgb)
