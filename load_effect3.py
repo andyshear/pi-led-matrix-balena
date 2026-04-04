@@ -33,6 +33,8 @@ race_timer_label = ""
 PANEL_W = 16
 PANEL_H = 16
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 def set_current_effect(effect):
     global current_effect
@@ -149,18 +151,22 @@ def draw_text_centered_fixed(draw, text, y, font, fill, width, spacing=1):
         x += char_widths[i] + spacing
 
 ICON_MAP = {
-    "aztec": "/assets/icons/aztec.png",
-    "suika": "/assets/icons/suika.png",
-    "mananaRanch": "/assets/icons/mananaRanch.png",
-    "icon": "/assets/icons/icon.png",
+    "aztec": os.path.join(BASE_DIR, "assets", "icons", "aztec.png"),
+    "suika": os.path.join(BASE_DIR, "assets", "icons", "suika.png"),
+    "mananaranch": os.path.join(BASE_DIR, "assets", "icons", "mananaranch.png"),
+    "icon": os.path.join(BASE_DIR, "assets", "icons", "icon.png"),
 }
 
 def render_icon_frame(payload: dict):
     width, height = pixel_width, pixel_height
-
-    icon_key = str(payload.get("icon", "")).lower()
+    icon_key = str(payload.get("icon", "") or "").lower()
 
     path = ICON_MAP.get(icon_key)
+
+    print(f"[icon] BASE_DIR={BASE_DIR}")
+    print(f"[icon] icon_key={icon_key}")
+    print(f"[icon] resolved path={path}")
+    print(f"[icon] exists={os.path.exists(path) if path else False}")
 
     if not path:
         print(f"[icon] unknown icon: {icon_key}")
