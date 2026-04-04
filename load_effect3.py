@@ -5,7 +5,7 @@ import time
 import os
 from collections import deque
 import queue
-
+import numpy as np
 from src.led_matrix1 import Matrix, pixel_height, pixel_width
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter, ImageChops
 
@@ -210,6 +210,23 @@ def load_icon_image(path, width, height):
         rgb = ImageEnhance.Contrast(rgb).enhance(1.15)
         rgb = rgb.filter(ImageFilter.SHARPEN)
 
+        palette = Image.new("P", (1, 1))
+        palette.putpalette([
+            0, 0, 0,         # black
+            255, 255, 255,   # white
+            255, 0, 0,       # red
+            255, 200, 0,     # yellow
+            0, 255, 0,       # green
+            0, 120, 255,     # blue
+            255, 120, 0,     # orange
+        ] + [0, 0, 0] * 249)
+
+        rgb = rgb.quantize(palette=palette, dither=Image.Dither.NONE).convert("RGB")
+
+
+        rgb = np.array(rgb)
+        rgb[rgb > 240] = 240
+        rgb = Image.fromarray(rgb)
         # optional second sharpen for super simple logos only
         # rgb = rgb.filter(ImageFilter.SHARPEN)
 
