@@ -154,7 +154,7 @@ ICON_MAP = {
     "aztec": os.path.join(BASE_DIR, "assets", "icons", "aztec.png"),
     "suika": os.path.join(BASE_DIR, "assets", "icons", "suika.png"),
     "mananaranch": os.path.join(BASE_DIR, "assets", "icons", "mananaranch.png"),
-    "icon": os.path.join(BASE_DIR, "assets", "icons", "icon.png"),
+    "icon": os.path.join(BASE_DIR, "assets", "icons", "logo.png"),
 }
 
 def render_icon_frame(payload: dict):
