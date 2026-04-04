@@ -181,73 +181,45 @@ def load_icon_image(path, width, height):
     try:
         img = Image.open(path).convert("RGBA")
 
-        # Fit inside board with a little margin
+        # kill almost-white background pixels so they don't nuke the board
+        px = img.load()
+        for y in range(img.height):
+            for x in range(img.width):
+                r, g, b, a = px[x, y]
+                if a == 0:
+                    continue
+
+                # near-white -> transparent
+                if r > 235 and g > 235 and b > 235:
+                    px[x, y] = (0, 0, 0, 0)
+
+        # fit inside board with a little margin
         target_w = max(1, width - 4)
         target_h = max(1, height - 4)
         img.thumbnail((target_w, target_h), Image.Resampling.LANCZOS)
 
-        # Composite onto black, not white
+        # small, controlled enhancement for icon mode only
+        rgb = Image.new("RGB", img.size, (0, 0, 0))
+        rgb.paste(img, (0, 0), img)
+
+        rgb = ImageEnhance.Color(rgb).enhance(1.20)
+        rgb = ImageEnhance.Contrast(rgb).enhance(1.10)
+        rgb = rgb.filter(ImageFilter.SHARPEN)
+
+        # optional second sharpen for super simple logos only
+        # rgb = rgb.filter(ImageFilter.SHARPEN)
+
         canvas = Image.new("RGB", (width, height), (0, 0, 0))
+        x = (width - rgb.width) // 2
+        y = (height - rgb.height) // 2
+        canvas.paste(rgb, (x, y))
 
-        x = (width - img.width) // 2
-        y = (height - img.height) // 2
-
-        canvas.paste(img, (x, y), img)
         return canvas
 
     except Exception as e:
         print(f"[icon] failed to load {path}: {e}")
         return Image.new("RGB", (width, height), (0, 0, 0))
-# def load_icon_image(path, width, height):
-#     try:
-#         img = Image.open(path).convert("RGBA")
-
-#         # crop away mostly-white borders if present
-#         bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
-#         diff = ImageChops.difference(img, bg)
-#         bbox = diff.getbbox()
-#         if bbox:
-#             img = img.crop(bbox)
-
-#         # contrast + brightness before shrinking
-#         img = ImageEnhance.Contrast(img).enhance(1.25)
-#         img = ImageEnhance.Brightness(img).enhance(1.15)
-
-#         # fit inside board with margin
-#         target_w = max(1, width - 4)
-#         target_h = max(1, height - 4)
-#         img.thumbnail((target_w, target_h), Image.Resampling.LANCZOS)
-
-#         # quantize to LED-friendly palette
-#         palette = Image.new("P", (1, 1))
-#         palette.putpalette([
-#             0, 0, 0,         # black
-#             255, 255, 255,   # white
-#             255, 0, 0,       # red
-#             255, 220, 0,     # yellow
-#             0, 255, 0,       # green
-#             0, 120, 255,     # blue
-#             255, 120, 0,     # orange
-#             180, 180, 180    # gray
-#         ] + [0, 0, 0] * 248)
-
-#         rgb = Image.new("RGB", img.size, (0, 0, 0))
-#         rgb.paste(img, (0, 0), img)
-#         rgb = rgb.quantize(palette=palette, dither=Image.Dither.NONE).convert("RGB")
-
-#         # subtle sharpen after quantization
-#         rgb = rgb.filter(ImageFilter.SHARPEN)
-
-#         canvas = Image.new("RGB", (width, height), (0, 0, 0))
-#         x = (width - rgb.width) // 2
-#         y = (height - rgb.height) // 2
-#         canvas.paste(rgb, (x, y))
-
-#         return canvas
-#     except Exception as e:
-#         print(f"[icon] failed to load {path}: {e}")
-#         return Image.new("RGB", (width, height), (0, 0, 0))
-
+        
 def draw_text_left(draw, text, x, y, font, fill):
     if not text:
         return
