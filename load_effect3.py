@@ -7,7 +7,7 @@ from collections import deque
 import queue
 
 from src.led_matrix1 import Matrix, pixel_height, pixel_width
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter, ImageChops
 
 times_history = deque(maxlen=2)
 times_queue = queue.Queue()
@@ -172,18 +172,46 @@ def load_icon_image(path, width, height):
     try:
         img = Image.open(path).convert("RGBA")
 
-        # Maintain aspect ratio + center
-        img.thumbnail((width, height), Image.Resampling.LANCZOS)
+        # crop away mostly-white borders if present
+        bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+        diff = ImageChops.difference(img, bg)
+        bbox = diff.getbbox()
+        if bbox:
+            img = img.crop(bbox)
+
+        # contrast + brightness before shrinking
+        img = ImageEnhance.Contrast(img).enhance(1.25)
+        img = ImageEnhance.Brightness(img).enhance(1.15)
+
+        # fit inside board with margin
+        target_w = max(1, width - 4)
+        target_h = max(1, height - 4)
+        img.thumbnail((target_w, target_h), Image.Resampling.LANCZOS)
+
+        # quantize to LED-friendly palette
+        palette = Image.new("P", (1, 1))
+        palette.putpalette([
+            0, 0, 0,         # black
+            255, 255, 255,   # white
+            255, 0, 0,       # red
+            255, 220, 0,     # yellow
+            0, 255, 0,       # green
+            0, 120, 255,     # blue
+            255, 120, 0,     # orange
+            180, 180, 180    # gray
+        ] + [0, 0, 0] * 248)
+
+        rgb = Image.new("RGB", img.size, (0, 0, 0))
+        rgb.paste(img, (0, 0), img)
+        rgb = rgb.quantize(palette=palette, dither=Image.Dither.NONE).convert("RGB")
+
+        # subtle sharpen after quantization
+        rgb = rgb.filter(ImageFilter.SHARPEN)
 
         canvas = Image.new("RGB", (width, height), (0, 0, 0))
-
-        x = (width - img.width) // 2
-        y = (height - img.height) // 2
-
-        img = ImageEnhance.Brightness(img).enhance(1.3)
-        img = img.filter(ImageFilter.SHARPEN)
-
-        canvas.paste(img, (x, y), img)
+        x = (width - rgb.width) // 2
+        y = (height - rgb.height) // 2
+        canvas.paste(rgb, (x, y))
 
         return canvas
     except Exception as e:
@@ -734,6 +762,9 @@ def render_start_gate_frame(payload: dict):
 
     if mode == "panelTest":
         return render_panel_test_frame(payload)
+
+    if mode == "icon":
+        return render_icon_frame(payload)
 
     frame = Image.new("RGB", (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(frame)
