@@ -89,7 +89,7 @@ def draw_text_centered(draw, text, y, font, fill, width):
     x = max(0, (width - text_w) // 2)
     draw.text((x, y), text, font=font, fill=fill)
 
-def marquee_offset_px(speed_px_per_sec=18):
+def marquee_offset_px(speed_px_per_sec=30):
     now_ms = int(time.time() * 1000)
     return int((now_ms / 1000.0) * speed_px_per_sec)
 
@@ -692,7 +692,7 @@ def render_start_gate_frame(payload: dict):
     # BIG NUMBER MODE
     # -----------------------------
     if mode == "bigNumber":
-        label_text = label.replace(" ", "")[:6]
+        label_text = label
         value_text = value[:3]
 
         label_font = safe_load_font(10)
@@ -716,7 +716,7 @@ def render_start_gate_frame(payload: dict):
         text_h = bbox[3] - bbox[1]
 
         # only a tiny gap under the label
-        value_top = 5
+        value_top = 3
         value_area_h = height - value_top
 
         x = max(0, (width - text_w) // 2)
@@ -739,7 +739,7 @@ def render_start_gate_frame(payload: dict):
         timer_line = line2 or ""
 
     # Keep the top line compact for a 48x48 board
-    header_text = line1.strip()
+    header_text = line1
     footer3 = line3.replace(" ", "")[:8]
     footer4 = line4.replace(" ", "")[:8]
 
@@ -751,7 +751,7 @@ def render_start_gate_frame(payload: dict):
         draw_text_marquee(
             draw,
             header_text,
-            0,
+            -1,
             header_font,
             (255, 220, 80),
             width,
