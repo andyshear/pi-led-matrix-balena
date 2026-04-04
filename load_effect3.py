@@ -82,13 +82,27 @@ def text_bbox(draw, text, font):
         return (0, 0, w, h)
 
 
-def draw_text_centered(draw, text, y, font, fill, width):
+def draw_text_centered_fixed(draw, text, y, font, fill, width, spacing=1):
     if not text:
         return
-    bbox = text_bbox(draw, text, font)
-    text_w = bbox[2] - bbox[0]
-    x = max(0, (width - text_w) // 2)
-    draw.text((x, y), text, font=font, fill=fill)
+
+    char_widths = []
+    total_w = 0
+
+    for ch in text:
+        bbox = text_bbox(draw, ch, font)
+        ch_w = bbox[2] - bbox[0]
+        char_widths.append(ch_w)
+        total_w += ch_w
+
+    if len(text) > 1:
+        total_w += spacing * (len(text) - 1)
+
+    x = max(0, (width - total_w) // 2)
+
+    for i, ch in enumerate(text):
+        draw.text((x, y), ch, font=font, fill=fill)
+        x += char_widths[i] + spacing
 
 
 def draw_text_left(draw, text, x, y, font, fill):
@@ -637,20 +651,23 @@ def render_start_gate_frame(payload: dict):
         label_text = label.replace(" ", "")[:6]
         value_text = value[:3]
 
-        label_font = safe_load_font(12)
-        value_font = safe_load_mono_font(40)
+        label_font = safe_load_font(11)
+        value_font = safe_load_font(44)
 
+        # top banner
         if label_text:
-            draw_text_centered(draw, label_text, 0, label_font, (255, 220, 80), width)
+            draw_text_centered(draw, label_text, -1, label_font, (255, 220, 80), width)
 
         bbox = text_bbox(draw, value_text, value_font)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
 
-        # reserve small top band for label, let number dominate everything else
-        value_top = 10
+        # only a tiny gap under the label
+        value_top = 5
+        value_area_h = height - value_top
+
         x = max(0, (width - text_w) // 2)
-        y = value_top + max(0, ((height - value_top) - text_h) // 2) + 2
+        y = value_top + max(0, (value_area_h - text_h) // 2) - 2
 
         draw.text((x, y), value_text, font=value_font, fill=(255, 255, 255))
         return frame
@@ -674,27 +691,30 @@ def render_start_gate_frame(payload: dict):
     footer4 = line4.replace(" ", "")[:8]
 
     header_font = safe_load_font(10)
-    timer_font = safe_load_mono_font(22)
+    timer_font = safe_load_mono_font(20)
     footer_font = safe_load_font(7)
 
-    # Header band
     if header_text:
-        draw_text_centered(draw, header_text, 1, header_font, (80, 220, 255), width)
+        draw_text_centered(draw, header_text, 0, header_font, (80, 220, 255), width)
 
-    # Middle timer band
     if timer_line:
         bbox = text_bbox(draw, timer_line, timer_font)
-        text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
 
-        middle_top = 13
-        middle_h = 22
-        x = max(0, (width - text_w) // 2)
-        y = middle_top + max(0, (middle_h - text_h) // 2)
+        middle_top = 15
+        middle_h = 18
+        y = middle_top + max(0, (middle_h - text_h) // 2) - 1
 
-        draw.text((x, y), timer_line, font=timer_font, fill=(255, 255, 255))
+        draw_text_centered_fixed(
+            draw,
+            timer_line,
+            y,
+            timer_font,
+            (255, 255, 255),
+            width,
+            spacing=0
+        )
 
-    # Bottom helpers, only if used
     if footer4:
         draw_text_centered(draw, footer4, 32, footer_font, (180, 180, 255), width)
 
