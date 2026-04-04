@@ -707,7 +707,7 @@ def render_start_gate_frame(payload: dict):
                 label_font,
                 (255, 220, 80),
                 width,
-                offset_x=marquee_offset_px(20),
+                offset_x=marquee_offset_px(16),
                 gap=8,
             )
 
@@ -754,7 +754,7 @@ def render_start_gate_frame(payload: dict):
             header_font,
             (255, 220, 80),
             width,
-            offset_x=marquee_offset_px(20),
+            offset_x=marquee_offset_px(16),
             gap=8,
         )
 
@@ -792,8 +792,8 @@ def effect_startGateDisplay(initial_payload=None):
         frame = render_start_gate_frame(payload)
         push_image_to_matrix(frame)
 
-        # ~30 FPS for smooth marquee / animation
-        matrix.delay(20)
+        # ~60 FPS for smooth marquee / animation
+        matrix.delay(16)
 
 
 def effect_startGateCountdown(_payload=None):
