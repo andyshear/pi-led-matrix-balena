@@ -269,6 +269,7 @@ class VirtualMatrix():
         self.frame = []
         self.reset()
         self.start_time = int(time.time())
+        self.use_enhance = True
 
     def ready(self):
         return ready(self.start_time)
@@ -283,12 +284,19 @@ class VirtualMatrix():
         rgb_image = img.convert(RGB)
         self.frame = np.array(rgb_image)
 
+    def set_enhance(self, enabled: bool):
+        self.use_enhance = bool(enabled)
+
     def show(self):
+        frame = self.frame
+        if self.use_enhance:
+            frame = enhance(frame)
+
         frame = cv2.resize(
-            self.frame,
+            frame,
             (pixel_width * VIRTUAL_SIZE_MULTIPLIER, pixel_height * VIRTUAL_SIZE_MULTIPLIER)
         )
-        cv2.imshow('LED matrix', enhance(frame))
+        cv2.imshow('LED matrix', frame)
         cv2.waitKey(virtual_framerate)
 
     def reset(self, rgb_color=(0, 0, 0)):
@@ -326,13 +334,13 @@ def pixels():
             pixel_order=neopixel.GRB,
         )
 
-
 class LiveMatrix():
     def __init__(self):
         self.frame = []
         self.reset()
         self.pixels = pixels()
         self.start_time = int(time.time())
+        self.use_enhance = True
 
         print("PANEL_MODE:", os.environ.get("PANEL_MODE", "row_serp_tl"))
         print("PANEL_ROTATION:", os.environ.get("PANEL_ROTATION", "none"))
@@ -385,14 +393,15 @@ class LiveMatrix():
     def sprite(self, sprite_map, start, color_map):
         sprite(self, sprite_map, start, color_map)
 
-    def show(self):
-        enhanced = enhance(self.frame)
+    def set_enhance(self, enabled: bool):
+        self.use_enhance = bool(enabled)
 
-        # enhanced frame is BGR because your pipeline stores [b, g, r]
-        # NeoPixel wants RGB tuples
+    def show(self):
+        frame_to_show = enhance(self.frame) if self.use_enhance else self.frame
+
         for y in range(pixel_height):
             for x in range(pixel_width):
-                b, g, r = enhanced[y, x]
+                b, g, r = frame_to_show[y, x]
                 idx = logical_xy_to_strip_index(x, y)
                 if 0 <= idx < len(self.pixels):
                     self.pixels[idx] = (int(r), int(g), int(b))
