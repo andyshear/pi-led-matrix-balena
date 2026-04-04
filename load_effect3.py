@@ -190,7 +190,9 @@ def load_icon_image(path, width, height):
                     continue
 
                 # near-white -> transparent
-                if r > 235 and g > 235 and b > 235:
+                # if r > 235 and g > 235 and b > 235:
+                #     px[x, y] = (0, 0, 0, 0)
+                if r > 220 and g > 220 and b > 220:
                     px[x, y] = (0, 0, 0, 0)
 
         # fit inside board with a little margin
@@ -202,8 +204,10 @@ def load_icon_image(path, width, height):
         rgb = Image.new("RGB", img.size, (0, 0, 0))
         rgb.paste(img, (0, 0), img)
 
-        rgb = ImageEnhance.Color(rgb).enhance(1.20)
-        rgb = ImageEnhance.Contrast(rgb).enhance(1.10)
+        # rgb = ImageEnhance.Color(rgb).enhance(1.20)
+        # rgb = ImageEnhance.Contrast(rgb).enhance(1.10)
+        rgb = ImageEnhance.Color(rgb).enhance(1.30)
+        rgb = ImageEnhance.Contrast(rgb).enhance(1.15)
         rgb = rgb.filter(ImageFilter.SHARPEN)
 
         # optional second sharpen for super simple logos only
@@ -219,7 +223,7 @@ def load_icon_image(path, width, height):
     except Exception as e:
         print(f"[icon] failed to load {path}: {e}")
         return Image.new("RGB", (width, height), (0, 0, 0))
-        
+
 def draw_text_left(draw, text, x, y, font, fill):
     if not text:
         return
