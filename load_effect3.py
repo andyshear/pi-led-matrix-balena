@@ -89,9 +89,9 @@ def draw_text_centered(draw, text, y, font, fill, width):
     x = max(0, (width - text_w) // 2)
     draw.text((x, y), text, font=font, fill=fill)
 
-def marquee_offset_px(speed_px_per_sec=30):
+def marquee_offset_px(speed_px_per_sec=45):
     now_ms = int(time.time() * 1000)
-    return int((now_ms / 1000.0) * speed_px_per_sec)
+    return round((now_ms / 1000.0) * speed_px_per_sec)
 
 def draw_text_marquee(draw, text, y, font, fill, width, offset_x=0, gap=12):
     """
@@ -707,20 +707,19 @@ def render_start_gate_frame(payload: dict):
                 label_font,
                 (255, 220, 80),
                 width,
-                offset_x=marquee_offset_px(16),
-                gap=10,
+                offset_x=marquee_offset_px(45),
+                gap=6,
             )
 
         bbox = text_bbox(draw, value_text, value_font)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
 
-        # only a tiny gap under the label
-        value_top = 3
-        value_area_h = height - value_top
-
         x = max(0, (width - text_w) // 2)
-        y = value_top + max(0, (value_area_h - text_h) // 2) - 2
+
+        # Pull value much closer to the header
+        # Smaller y = higher on screen
+        y = 7
 
         draw.text((x, y), value_text, font=value_font, fill=(255, 255, 255))
         return frame
@@ -755,8 +754,8 @@ def render_start_gate_frame(payload: dict):
             header_font,
             (255, 220, 80),
             width,
-            offset_x=marquee_offset_px(16),
-            gap=10,
+            offset_x=marquee_offset_px(45),
+            gap=6,
         )
 
     if timer_line:
@@ -788,22 +787,13 @@ def render_start_gate_frame(payload: dict):
 
 def effect_startGateDisplay(initial_payload=None):
     payload = initial_payload if isinstance(initial_payload, dict) else {}
-    last_render_key = None
 
     while not stop_event.is_set() and get_current_effect() == 'startGateDisplay':
-        now_ms = int(time.time() * 1000)
+        frame = render_start_gate_frame(payload)
+        push_image_to_matrix(frame)
 
-        render_key = json.dumps({
-            "payload": payload,
-            "timerBucket": now_ms // 1000 if payload.get("showTimer") and payload.get("timerStartMs") is not None else None,
-        }, sort_keys=True)
-
-        if render_key != last_render_key:
-            frame = render_start_gate_frame(payload)
-            push_image_to_matrix(frame)
-            last_render_key = render_key
-
-        matrix.delay(80)
+        # ~30 FPS for smooth marquee / animation
+        matrix.delay(33)
 
 
 def effect_startGateCountdown(_payload=None):
