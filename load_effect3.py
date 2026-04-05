@@ -844,7 +844,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
                 label_font,
                 (255, 220, 80),
                 width,
-                offset_x=marquee_offset,
+                offset_x=marquee_offset_px(16),
                 gap=8,
             )
 
@@ -867,7 +867,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
                 footer_font,
                 (0, 255, 0),
                 width,
-                offset_x=marquee_offset,
+                offset_x=marquee_offset_px(16),
                 gap=12,
             )
 
@@ -903,7 +903,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
             header_font,
             (255, 220, 80),
             width,
-            offset_x=marquee_offset,
+            offset_x=marquee_offset_px(16),
             gap=8,
         )
 
