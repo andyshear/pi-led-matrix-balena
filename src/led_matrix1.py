@@ -271,6 +271,21 @@ class VirtualMatrix():
         self.start_time = int(time.time())
         self.use_enhance = True
 
+        print(
+            "VIRTUAL_MATRIX_INIT",
+            {
+                "width": pixel_width,
+                "height": pixel_height,
+                "tile_w": TILE_W,
+                "tile_h": TILE_H,
+                "tile_cols": TILE_COLS,
+                "tile_rows": TILE_ROWS,
+                "tile_order": TILE_ORDER,
+                "tile_serpentine": TILE_SERPENTINE,
+                "num_pixels": pixel_width * pixel_height,
+            },
+        )
+
     def ready(self):
         return ready(self.start_time)
 
