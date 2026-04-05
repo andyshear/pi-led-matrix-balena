@@ -829,7 +829,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
                 label_font,
                 (255, 220, 80),
                 width,
-                offset_x=marquee_offset,
+                offset_x=marquee_offset_px(16),
                 gap=8,
             )
 
@@ -928,12 +928,13 @@ def effect_startGateDisplay(initial_payload=None):
         now_ms = int(time.time() * 1000)
         mode = str(payload.get("mode", "raceInfo") or "raceInfo")
 
-        marquee_modes = {"raceInfoMarquee", "bigNumberLeaderboard"}
+        manual_marquee_modes = {"raceInfoMarquee", "bigNumberLeaderboard"}
 
         render_key = json.dumps({
             "payload": payload,
             "timerBucket": now_ms // 1000 if payload.get("showTimer") and payload.get("timerStartMs") is not None else None,
-            "marqueeBucket": marquee_offset if mode in marquee_modes else None,
+            "timeMarqueeBucket": now_ms // 50 if mode in {"bigNumber", "raceInfo"} else None,
+            "manualMarqueeBucket": marquee_offset if mode in manual_marquee_modes else None,
         }, sort_keys=True)
 
         if render_key != last_render_key:
