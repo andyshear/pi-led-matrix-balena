@@ -33,11 +33,12 @@ race_timer_label = ""
 PANEL_W = 16
 PANEL_H = 16
 
-LOGICAL_WIDTH = 48
-LOGICAL_HEIGHT = 48
-DUPLICATE_TO_BOTTOM = True
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DUPLICATE_VERTICAL_STACK = os.environ.get("DUPLICATE_VERTICAL_STACK", "false").lower() == "true"
+
+LOGICAL_WIDTH = pixel_width
+LOGICAL_HEIGHT = pixel_height // 2 if DUPLICATE_VERTICAL_STACK else pixel_height
 
 
 def set_current_effect(effect):
@@ -257,8 +258,8 @@ def draw_text_left(draw, text, x, y, font, fill):
 def push_image_to_matrix(image):
     src_w, src_h = image.size
 
-    # If duplication is off, keep normal behavior
-    if not DUPLICATE_TO_BOTTOM:
+    # Normal mode: write exactly what was rendered
+    if not DUPLICATE_VERTICAL_STACK:
         for x in range(src_w):
             for y in range(src_h):
                 r, g, b = image.getpixel((x, y))
@@ -266,32 +267,21 @@ def push_image_to_matrix(image):
         matrix.show()
         return
 
-    # Expected physical layout:
-    # logical render = 48x48
-    # physical matrix = 48x96
-    # duplicate top half onto bottom half
-    if pixel_width != src_w or pixel_height != src_h * 2:
-        print(
-            f"[dup] WARNING expected physical matrix {src_w}x{src_h * 2}, "
-            f"got {pixel_width}x{pixel_height}. Falling back to normal draw."
-        )
-        for x in range(min(src_w, pixel_width)):
-            for y in range(min(src_h, pixel_height)):
-                r, g, b = image.getpixel((x, y))
-                matrix.pixel((x, y), (b, g, r))
-        matrix.show()
-        return
+    # Duplicate-top-to-bottom mode:
+    # expected physical panel = 48 x 96
+    # logical rendered frame = 48 x 48
+    half_h = pixel_height // 2
 
-    for x in range(src_w):
-        for y in range(src_h):
+    for x in range(min(src_w, pixel_width)):
+        for y in range(min(src_h, half_h)):
             r, g, b = image.getpixel((x, y))
             bgr = (b, g, r)
 
-            # top 48x48
+            # top half
             matrix.pixel((x, y), bgr)
 
-            # bottom 48x48 duplicate
-            matrix.pixel((x, y + src_h), bgr)
+            # bottom half duplicate
+            matrix.pixel((x, y + half_h), bgr)
 
     matrix.show()
 
