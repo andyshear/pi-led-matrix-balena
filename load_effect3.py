@@ -167,19 +167,34 @@ def render_icon_frame(payload: dict):
 
     width, height = pixel_width, pixel_height
     icon_key = str(payload.get("icon", "") or "").lower()
+    icon_path = str(payload.get("iconPath", "") or "").strip()
 
+    # 1) explicit downloaded local file wins
+    if icon_path:
+        print(f"[icon] requested iconPath={icon_path} exists={os.path.exists(icon_path)}")
+        if os.path.exists(icon_path):
+            return load_icon_image(icon_path, width, height)
+        else:
+            print("[icon] iconPath missing, falling back...")
+
+    # 2) try requested icon key
     path = ICON_MAP.get(icon_key)
 
-    print(f"[icon] BASE_DIR={BASE_DIR}")
-    print(f"[icon] icon_key={icon_key}")
-    print(f"[icon] resolved path={path}")
-    print(f"[icon] exists={os.path.exists(path) if path else False}")
+    if path and os.path.exists(path):
+        print(f"[icon] using ICON_MAP[{icon_key}] -> {path}")
+        return load_icon_image(path, width, height)
 
-    if not path:
-        print(f"[icon] unknown icon: {icon_key}")
-        return Image.new("RGB", (width, height), (0, 0, 0))
+    # 3) FINAL fallback → always use default logo
+    fallback = ICON_MAP.get("icon")
 
-    return load_icon_image(path, width, height)
+    print(f"[icon] fallback to default icon -> {fallback}")
+
+    if fallback and os.path.exists(fallback):
+        return load_icon_image(fallback, width, height)
+
+    # 4) absolute last resort (should never hit)
+    print("[icon] no valid icon found, rendering blank")
+    return Image.new("RGB", (width, height), (0, 0, 0))
 
 def load_icon_image(path, width, height):
     try:
