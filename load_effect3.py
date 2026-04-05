@@ -777,7 +777,7 @@ def render_panel_test_frame(payload: dict):
     return frame
 
 
-def render_start_gate_frame(payload: dict):
+def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
     width, height = pixel_width, pixel_height
     now_ms = int(time.time() * 1000)
 
@@ -808,12 +808,17 @@ def render_start_gate_frame(payload: dict):
     # -----------------------------
     # BIG NUMBER MODE
     # -----------------------------
-    if mode == "bigNumber":
-        label_text = label
-        value_text = value[:3]
+        # -----------------------------
+    # BIG NUMBER MODE
+    # -----------------------------
+    if mode in ("bigNumber", "bigNumberLeaderboard"):
+        label_text = label or line1
+        value_text = str(value or "")[:3]
+        leaderboard_text = line3 or ""
 
         label_font = safe_load_font(10)
         value_font = safe_load_font(36)
+        footer_font = safe_load_font(7)
 
         # top banner
         if label_text:
@@ -824,21 +829,33 @@ def render_start_gate_frame(payload: dict):
                 label_font,
                 (255, 220, 80),
                 width,
-                offset_x=marquee_offset_px(16),
+                offset_x=marquee_offset,
                 gap=8,
             )
 
+        # big center number
         bbox = text_bbox(draw, value_text, value_font)
         text_w = bbox[2] - bbox[0]
-        text_h = bbox[3] - bbox[1]
 
         x = max(0, (width - text_w) // 2)
 
-        # Pull value much closer to the header
-        # Smaller y = higher on screen
+        # keep the big number high enough to leave room for bottom text
         y = 7
-
         draw.text((x, y), value_text, font=value_font, fill=(255, 255, 255))
+
+        # optional bottom leaderboard / lap-times marquee
+        if mode == "bigNumberLeaderboard" and leaderboard_text:
+            draw_text_marquee(
+                draw,
+                leaderboard_text,
+                40,
+                footer_font,
+                (0, 255, 0),
+                width,
+                offset_x=marquee_offset,
+                gap=12,
+            )
+
         return frame
 
     # -----------------------------
@@ -904,13 +921,31 @@ def render_start_gate_frame(payload: dict):
 
 def effect_startGateDisplay(initial_payload=None):
     payload = initial_payload if isinstance(initial_payload, dict) else {}
+    last_render_key = None
+    marquee_offset = 0
 
     while not stop_event.is_set() and get_current_effect() == 'startGateDisplay':
-        frame = render_start_gate_frame(payload)
-        push_image_to_matrix(frame)
+        now_ms = int(time.time() * 1000)
+        mode = str(payload.get("mode", "raceInfo") or "raceInfo")
 
-        # ~60 FPS for smooth marquee / animation
-        matrix.delay(16)
+        marquee_modes = {"raceInfoMarquee", "bigNumberLeaderboard"}
+
+        render_key = json.dumps({
+            "payload": payload,
+            "timerBucket": now_ms // 1000 if payload.get("showTimer") and payload.get("timerStartMs") is not None else None,
+            "marqueeBucket": marquee_offset if mode in marquee_modes else None,
+        }, sort_keys=True)
+
+        if render_key != last_render_key:
+            frame = render_start_gate_frame(payload, marquee_offset=marquee_offset)
+            push_image_to_matrix(frame)
+            last_render_key = render_key
+
+        if mode in {"raceInfoMarquee", "bigNumberLeaderboard", "bigNumber"}:
+            marquee_offset += 1
+            matrix.delay(50)
+        else:
+            matrix.delay(80)
 
 
 def effect_startGateCountdown(_payload=None):
