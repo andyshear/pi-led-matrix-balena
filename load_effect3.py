@@ -829,7 +829,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
                 label_font,
                 (255, 220, 80),
                 width,
-                offset_x=marquee_offset_px(16),
+                offset_x=marquee_offset,
                 gap=8,
             )
 
@@ -888,7 +888,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
             header_font,
             (255, 220, 80),
             width,
-            offset_x=marquee_offset_px(16),
+            offset_x=marquee_offset,
             gap=8,
         )
 
@@ -928,13 +928,12 @@ def effect_startGateDisplay(initial_payload=None):
         now_ms = int(time.time() * 1000)
         mode = str(payload.get("mode", "raceInfo") or "raceInfo")
 
-        manual_marquee_modes = {"raceInfoMarquee", "bigNumberLeaderboard"}
+        marquee_modes = {"raceInfo", "raceInfoMarquee", "bigNumber", "bigNumberLeaderboard"}
 
         render_key = json.dumps({
             "payload": payload,
             "timerBucket": now_ms // 1000 if payload.get("showTimer") and payload.get("timerStartMs") is not None else None,
-            "timeMarqueeBucket": now_ms // 50 if mode in {"bigNumber", "raceInfo"} else None,
-            "manualMarqueeBucket": marquee_offset if mode in manual_marquee_modes else None,
+            "marqueeBucket": marquee_offset if mode in marquee_modes else None,
         }, sort_keys=True)
 
         if render_key != last_render_key:
@@ -942,7 +941,7 @@ def effect_startGateDisplay(initial_payload=None):
             push_image_to_matrix(frame)
             last_render_key = render_key
 
-        if mode in {"raceInfoMarquee", "bigNumberLeaderboard", "bigNumber"}:
+        if mode in marquee_modes:
             marquee_offset += 1
             matrix.delay(50)
         else:
