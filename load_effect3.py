@@ -171,10 +171,10 @@ def render_icon_frame(payload: dict):
 
     path = ICON_MAP.get(icon_key)
 
-    print(f"[icon] BASE_DIR={BASE_DIR}")
-    print(f"[icon] icon_key={icon_key}")
-    print(f"[icon] resolved path={path}")
-    print(f"[icon] exists={os.path.exists(path) if path else False}")
+    # print(f"[icon] BASE_DIR={BASE_DIR}")
+    # print(f"[icon] icon_key={icon_key}")
+    # print(f"[icon] resolved path={path}")
+    # print(f"[icon] exists={os.path.exists(path) if path else False}")
 
     if not path:
         print(f"[icon] unknown icon: {icon_key}")
