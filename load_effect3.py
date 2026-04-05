@@ -33,12 +33,11 @@ race_timer_label = ""
 PANEL_W = 16
 PANEL_H = 16
 
+LOGICAL_WIDTH = 48
+LOGICAL_HEIGHT = 48
+DUPLICATE_TO_BOTTOM = True
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-DUPLICATE_VERTICAL_STACK = os.environ.get("DUPLICATE_VERTICAL_STACK", "false").lower() == "true"
-
-LOGICAL_WIDTH = pixel_width
-LOGICAL_HEIGHT = pixel_height // 2 if DUPLICATE_VERTICAL_STACK else pixel_height
 
 
 def set_current_effect(effect):
@@ -166,15 +165,15 @@ def render_icon_frame(payload: dict):
     if hasattr(matrix, "set_enhance"):
         matrix.set_enhance(False)
 
-    width, height = LOGICAL_WIDTH, LOGICAL_HEIGHT
+    width, height = pixel_width, pixel_height
     icon_key = str(payload.get("icon", "") or "").lower()
 
     path = ICON_MAP.get(icon_key)
 
-    # print(f"[icon] BASE_DIR={BASE_DIR}")
-    # print(f"[icon] icon_key={icon_key}")
-    # print(f"[icon] resolved path={path}")
-    # print(f"[icon] exists={os.path.exists(path) if path else False}")
+    print(f"[icon] BASE_DIR={BASE_DIR}")
+    print(f"[icon] icon_key={icon_key}")
+    print(f"[icon] resolved path={path}")
+    print(f"[icon] exists={os.path.exists(path) if path else False}")
 
     if not path:
         print(f"[icon] unknown icon: {icon_key}")
@@ -256,33 +255,11 @@ def draw_text_left(draw, text, x, y, font, fill):
 
 
 def push_image_to_matrix(image):
-    src_w, src_h = image.size
-
-    # Normal mode: write exactly what was rendered
-    if not DUPLICATE_VERTICAL_STACK:
-        for x in range(src_w):
-            for y in range(src_h):
-                r, g, b = image.getpixel((x, y))
-                matrix.pixel((x, y), (b, g, r))
-        matrix.show()
-        return
-
-    # Duplicate-top-to-bottom mode:
-    # expected physical panel = 48 x 96
-    # logical rendered frame = 48 x 48
-    half_h = pixel_height // 2
-
-    for x in range(min(src_w, pixel_width)):
-        for y in range(min(src_h, half_h)):
+    width, height = image.size
+    for x in range(width):
+        for y in range(height):
             r, g, b = image.getpixel((x, y))
-            bgr = (b, g, r)
-
-            # top half
-            matrix.pixel((x, y), bgr)
-
-            # bottom half duplicate
-            matrix.pixel((x, y + half_h), bgr)
-
+            matrix.pixel((x, y), (b, g, r))
     matrix.show()
 
 def effect_icon(initial_payload=None):
@@ -620,7 +597,7 @@ def effect_times(_initial_rider_data_ignored=None):
         laps_by_rider[name] = laps_val
         _last_time_by_rider[name] = lap_time
 
-    WIDTH, HEIGHT = LOGICAL_WIDTH, LOGICAL_HEIGHT
+    WIDTH, HEIGHT = pixel_width, pixel_height
     NUM_LANES = 5
     PANE_W = max(1, WIDTH // NUM_LANES)
 
@@ -740,7 +717,7 @@ def render_panel_test_frame(payload: dict):
     Draw 1..9 centered in each 16x16 tile on a 48x48 board.
     This is for physical mapping verification only.
     """
-    width, height = LOGICAL_WIDTH, LOGICAL_HEIGHT
+    width, height = pixel_width, pixel_height
     frame = Image.new("RGB", (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(frame)
 
@@ -801,7 +778,7 @@ def render_panel_test_frame(payload: dict):
 
 
 def render_start_gate_frame(payload: dict):
-    width, height = LOGICAL_WIDTH, LOGICAL_HEIGHT
+    width, height = pixel_width, pixel_height
     now_ms = int(time.time() * 1000)
 
     mode = str(payload.get("mode", "raceInfo") or "raceInfo")
@@ -937,7 +914,7 @@ def effect_startGateDisplay(initial_payload=None):
 
 
 def effect_startGateCountdown(_payload=None):
-    width, height = LOGICAL_WIDTH, LOGICAL_HEIGHT
+    width, height = pixel_width, pixel_height
     label_font = safe_load_font(max(10, int(height * 0.18)))
     big_font = safe_load_font(max(20, int(height * 0.75)))
 

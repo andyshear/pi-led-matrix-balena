@@ -349,11 +349,32 @@ def pixels():
             pixel_order=neopixel.GRB,
         )
 
+def pixels_front():
+    if not VIRTUAL_ENV:
+        return neopixel.NeoPixel(
+            board.D18,
+            pixel_width * pixel_height,
+            brightness=brightness,
+            auto_write=False,
+            pixel_order=neopixel.GRB,
+        )
+
+def pixels_back():
+    if not VIRTUAL_ENV:
+        return neopixel.NeoPixel(
+            board.D21,  # example, replace with your chosen second pin
+            pixel_width * pixel_height,
+            brightness=brightness,
+            auto_write=False,
+            pixel_order=neopixel.GRB,
+        )
+
 class LiveMatrix():
     def __init__(self):
         self.frame = []
         self.reset()
-        self.pixels = pixels()
+        self.pixels_front = pixels_front()
+        self.pixels_back = pixels_back()
         self.start_time = int(time.time())
         self.use_enhance = True
 
@@ -418,10 +439,13 @@ class LiveMatrix():
             for x in range(pixel_width):
                 b, g, r = frame_to_show[y, x]
                 idx = logical_xy_to_strip_index(x, y)
-                if 0 <= idx < len(self.pixels):
-                    self.pixels[idx] = (int(r), int(g), int(b))
+                if 0 <= idx < len(self.pixels_front):
+                    rgb = (int(r), int(g), int(b))
+                    self.pixels_front[idx] = rgb
+                    self.pixels_back[idx] = rgb
 
-        self.pixels.show()
+        self.pixels_front.show()
+        self.pixels_back.show()
 
     def text(self, message, start, font_size, rgb_color, font='dosis.ttf'):
         text(self, message, start, font_size, rgb_color, font)
