@@ -943,7 +943,7 @@ def effect_startGateDisplay(initial_payload=None):
 
         if mode in marquee_modes:
             marquee_offset += 1
-            matrix.delay(50)
+            matrix.delay(20)
         else:
             matrix.delay(80)
 
