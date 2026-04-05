@@ -470,6 +470,10 @@ def effect_times(_initial_rider_data_ignored=None):
         s = total_s % 60
         return f"{m}:{s:02d}"
 
+    def draw_lane_placeholder(draw, pane_x0: int, top_text: str, bottom_text: str):
+        draw.text((pane_x0, NAME_Y), top_text, font=font, fill=(80, 160, 255))
+        draw.text((pane_x0, TIME_Y), bottom_text, font=font, fill=(140, 140, 140))
+
     while not stop_event.is_set() and get_current_effect() == 'times':
         now_ms = int(time.time() * 1000)
         timer_active = (race_timer_start_ms is not None)
@@ -484,6 +488,11 @@ def effect_times(_initial_rider_data_ignored=None):
                 break
             try:
                 bike, name, laps_str, lap_time = parse_quad(payload)
+
+                # ignore blank/system entries if you ever send one later
+                if not str(name).strip() or str(name).startswith("__"):
+                    continue
+
                 record_seen(name, lap_time, laps_str)
                 rider_rec[name] = (bike, name, laps_str, lap_time)
 
@@ -504,6 +513,7 @@ def effect_times(_initial_rider_data_ignored=None):
         frame = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
         draw = ImageDraw.Draw(frame)
 
+        # left timer lane during an active race
         if timer_active:
             elapsed_ms = now_ms - race_timer_start_ms
             t_str = fmt_mmss(elapsed_ms)
@@ -515,13 +525,20 @@ def effect_times(_initial_rider_data_ignored=None):
             else:
                 draw.text((pane_x0, NAME_Y), t_str, font=font, fill=(255, 255, 255))
 
+        # rider lanes or placeholders
         for lane in range(riders_first_lane, riders_last_lane + 1):
-            if not lane_roster[lane]:
-                continue
             pane_x0 = lane * PANE_W
-            active_name = lane_roster[lane][lane_active_idx[lane]]
 
+            if not lane_roster[lane]:
+                if timer_active:
+                    draw_lane_placeholder(draw, pane_x0, "WAIT", "TIME")
+                else:
+                    draw_lane_placeholder(draw, pane_x0, "NO", "TIME")
+                continue
+
+            active_name = lane_roster[lane][lane_active_idx[lane]]
             bike, nm, _laps_str, lap_time = rider_rec.get(active_name, ("", active_name, "", ""))
+
             num_color = get_bike_color(bike)
             time_color = (255, 255, 255)
 
