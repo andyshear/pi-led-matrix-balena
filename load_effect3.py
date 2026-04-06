@@ -913,6 +913,8 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
     leaderboard_entries = payload.get("leaderboard", []) or []
     big_mode = str(payload.get("bigMode", "timer") or "timer")
     big_value = str(payload.get("value", "") or "")
+    show_background_icon = bool(payload.get("showBackgroundIcon", False))
+    disable_header_marquee = bool(payload.get("disableHeaderMarquee", False))
 
     if mode == "panelTest":
         return render_panel_test_frame(payload)
@@ -928,43 +930,41 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
     frame = Image.new("RGB", (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(frame)
 
-    show_background_icon = bool(payload.get("showBackgroundIcon", False))
-
     if show_background_icon:
         bg_icon = load_icon_rgba(payload, width, height)
         if bg_icon is not None:
             icon_x = (width - bg_icon.width) // 2
             icon_y = (height - bg_icon.height) // 2 + 2
 
-            # dim the icon slightly so text stays readable
             alpha = bg_icon.getchannel("A")
-            alpha = alpha.point(lambda p: int(p * 0.28))
+            alpha = alpha.point(lambda p: int(p * 0.22))
             bg_icon.putalpha(alpha)
 
             frame.paste(bg_icon, (icon_x, icon_y), bg_icon)
             draw = ImageDraw.Draw(frame)
-            
-    header_font = safe_load_font(10)
+
+    header_font = safe_load_font(11)
     big_font = safe_load_mono_font(22)
-    footer_font = safe_load_font(9)
+    footer_font = safe_load_font(10)
 
     header_text = line1
     footer4 = line4.replace(" ", "")[:8] if line4 else ""
 
-    # top header marquee
     if header_text:
-        draw_text_marquee(
-            draw,
-            header_text,
-            -1,
-            header_font,
-            (255, 220, 80),
-            width,
-            offset_x=marquee_offset_px(16),
-            gap=8,
-        )
+        if disable_header_marquee:
+            draw_text_centered(draw, header_text, 0, header_font, (255, 220, 80), width)
+        else:
+            draw_text_marquee(
+                draw,
+                header_text,
+                0,
+                header_font,
+                (255, 220, 80),
+                width,
+                offset_x=marquee_offset_px(16),
+                gap=8,
+            )
 
-    # center big value: timer or race number
     center_text = ""
     if big_mode == "timer":
         if show_timer and timer_start_ms is not None:
@@ -982,8 +982,8 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
     if center_text:
         bbox = text_bbox(draw, center_text, big_font)
         text_h = bbox[3] - bbox[1]
-        middle_top = 15
-        middle_h = 18
+        middle_top = 12
+        middle_h = 22
         y = middle_top + max(0, (middle_h - text_h) // 2) - 1
 
         draw_text_centered_fixed(
@@ -996,14 +996,15 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
             spacing=0
         )
 
-    # bottom line
+    line3_y = 37  # moved up 3px from 40
+
     if mode == "raceInfoMarquee":
         if leaderboard_entries:
             segments = build_leaderboard_segments(leaderboard_entries)
             draw_segmented_marquee(
                 draw,
                 segments,
-                40,
+                line3_y,
                 footer_font,
                 width,
                 offset_x=marquee_offset_px(16),
@@ -1013,7 +1014,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
             draw_text_marquee(
                 draw,
                 line3 or "NO TIMES YET",
-                40,
+                line3_y,
                 footer_font,
                 (0, 255, 0),
                 width,
@@ -1023,10 +1024,10 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
         return frame
 
     if footer4:
-        draw_text_centered(draw, footer4, 32, footer_font, (180, 180, 255), width)
+        draw_text_centered(draw, footer4, 30, footer_font, (180, 180, 255), width)
 
     if line3:
-        draw_text_centered(draw, line3, 40, footer_font, (0, 255, 0), width)
+        draw_text_centered(draw, line3, line3_y, footer_font, (0, 255, 0), width)
 
     return frame
 
@@ -1037,11 +1038,17 @@ def effect_startGateDisplay(initial_payload=None):
     while not stop_event.is_set() and get_current_effect() == 'startGateDisplay':
         now_ms = int(time.time() * 1000)
         mode = str(payload.get("mode", "raceInfo") or "raceInfo")
+        disable_header_marquee = bool(payload.get("disableHeaderMarquee", False))
+
+        animate_fast = (
+            mode in {"raceInfoMarquee", "bigNumber", "bigNumberLeaderboard"}
+            or (mode == "raceInfo" and not disable_header_marquee)
+        )
 
         render_key = json.dumps({
             "payload": payload,
             "timerBucket": now_ms // 1000 if payload.get("showTimer") and payload.get("timerStartMs") is not None else None,
-            "marqueeBucket": now_ms // 20 if mode in {"raceInfo", "raceInfoMarquee", "bigNumber", "bigNumberLeaderboard"} else None,
+            "marqueeBucket": now_ms // 20 if animate_fast else None,
         }, sort_keys=True)
 
         if render_key != last_render_key:
@@ -1049,8 +1056,7 @@ def effect_startGateDisplay(initial_payload=None):
             push_image_to_matrix(frame)
             last_render_key = render_key
 
-        matrix.delay(20 if mode in {"raceInfo", "raceInfoMarquee", "bigNumber", "bigNumberLeaderboard"} else 80)
-
+        matrix.delay(20 if animate_fast else 120)
 
 def effect_startGateCountdown(_payload=None):
     width, height = pixel_width, pixel_height
