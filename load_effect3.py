@@ -823,9 +823,6 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
     # -----------------------------
     # BIG NUMBER MODE
     # -----------------------------
-        # -----------------------------
-    # BIG NUMBER MODE
-    # -----------------------------
     if mode in ("bigNumber", "bigNumberLeaderboard"):
         label_text = label or line1
         value_text = str(value or "")[:3]
@@ -888,7 +885,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
 
     # Keep the top line compact for a 48x48 board
     header_text = line1
-    # footer3 = line3.replace(" ", "")[:8]
+    footer3 = line3 or ""
     footer4 = line4.replace(" ", "")[:8]
 
     header_font = safe_load_font(10)
@@ -975,7 +972,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
     if footer4:
         draw_text_centered(draw, footer4, 32, footer_font, (180, 180, 255), width)
 
-    if footer3:
+    if footer3 and mode != "raceInfoMarquee":
         draw_text_centered(draw, footer3, 40, footer_font, (0, 255, 0), width)
 
     return frame
