@@ -944,7 +944,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
             draw = ImageDraw.Draw(frame)
 
     header_font = safe_load_font(11)
-    big_font = safe_load_mono_font(22)
+    big_font = safe_load_mono_font(36)
     footer_font = safe_load_font(10)
 
     header_text = line1
