@@ -886,6 +886,45 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
     else:
         timer_line = line2 or ""
 
+    # Keep the top line compact for a 48x48 board
+    header_text = line1
+    # footer3 = line3.replace(" ", "")[:8]
+    footer4 = line4.replace(" ", "")[:8]
+
+    header_font = safe_load_font(10)
+    timer_font = safe_load_mono_font(18)
+    footer_font = safe_load_font(7)
+
+    if header_text:
+        draw_text_marquee(
+            draw,
+            header_text,
+            -1,
+            header_font,
+            (255, 220, 80),
+            width,
+            offset_x=marquee_offset_px(16),
+            gap=8,
+        )
+
+    if timer_line:
+        bbox = text_bbox(draw, timer_line, timer_font)
+        text_h = bbox[3] - bbox[1]
+
+        middle_top = 15
+        middle_h = 18
+        y = middle_top + max(0, (middle_h - text_h) // 2) - 1
+
+        draw_text_centered_fixed(
+            draw,
+            timer_line,
+            y,
+            timer_font,
+            (255, 255, 255),
+            width,
+            spacing=0
+        )
+
     if mode == "raceInfoMarquee":
         # normal timer/header logic still happens above this point if you want,
         # but bottom line3 should scroll, not be truncated/centered
@@ -933,46 +972,6 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
         )
 
         return frame
-
-    # Keep the top line compact for a 48x48 board
-    header_text = line1
-    # footer3 = line3.replace(" ", "")[:8]
-    footer4 = line4.replace(" ", "")[:8]
-
-    header_font = safe_load_font(10)
-    timer_font = safe_load_mono_font(18)
-    footer_font = safe_load_font(7)
-
-    if header_text:
-        draw_text_marquee(
-            draw,
-            header_text,
-            -1,
-            header_font,
-            (255, 220, 80),
-            width,
-            offset_x=marquee_offset_px(16),
-            gap=8,
-        )
-
-    if timer_line:
-        bbox = text_bbox(draw, timer_line, timer_font)
-        text_h = bbox[3] - bbox[1]
-
-        middle_top = 15
-        middle_h = 18
-        y = middle_top + max(0, (middle_h - text_h) // 2) - 1
-
-        draw_text_centered_fixed(
-            draw,
-            timer_line,
-            y,
-            timer_font,
-            (255, 255, 255),
-            width,
-            spacing=0
-        )
-
     if footer4:
         draw_text_centered(draw, footer4, 32, footer_font, (180, 180, 255), width)
 
