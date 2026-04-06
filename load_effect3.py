@@ -39,6 +39,71 @@ DUPLICATE_TO_BOTTOM = True
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+def get_place_color(place: int):
+    if place == 1:
+        return (255, 215, 0)      # gold
+    if place == 2:
+        return (192, 192, 192)    # silver
+    if place == 3:
+        return (205, 127, 50)     # bronze
+    return (0, 255, 0)            # green for 4/5+
+
+def draw_segmented_marquee(draw, segments, y, font, width, offset_x=0, gap=16):
+    """
+    segments = [(text, (r,g,b)), ...]
+    Draws a horizontally scrolling multi-color marquee.
+    """
+    if not segments:
+        return
+
+    # measure one loop
+    seg_widths = []
+    total_w = 0
+    for text, color in segments:
+        bbox = text_bbox(draw, text, font)
+        w = bbox[2] - bbox[0]
+        seg_widths.append(w)
+        total_w += w
+
+    loop_w = total_w + gap
+    if loop_w <= 0:
+        return
+
+    scroll_x = -(offset_x % loop_w)
+
+    def draw_once(start_x):
+        x = start_x
+        for i, (text, color) in enumerate(segments):
+            draw.text((x, y), text, font=font, fill=color)
+            x += seg_widths[i]
+
+    x = scroll_x
+    while x < width:
+        draw_once(x)
+        x += loop_w
+
+def build_leaderboard_segments(entries):
+    segments = []
+
+    for idx, entry in enumerate(entries[:5]):
+        place = int(entry.get("place", idx + 1))
+        rider_number = str(entry.get("riderNumber", ""))
+        lap_time = str(entry.get("lapTime", ""))
+        bike = str(entry.get("bike", "")).lower()
+
+        place_color = get_place_color(place)
+        rider_color = get_bike_color(bike)
+        time_color = (255, 255, 255)
+
+        segments.append((f"{place}", place_color))
+        segments.append((f"{rider_number}", rider_color))
+        segments.append((f"{lap_time}", time_color))
+
+        if idx < len(entries[:5]) - 1:
+            segments.append(("   ", (0, 0, 0)))  # spacing only
+
+    return segments
+
 
 def set_current_effect(effect):
     global current_effect
@@ -801,10 +866,12 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
     line2 = str(payload.get("line2", "") or "")
     line3 = str(payload.get("line3", "") or "")
     line4 = str(payload.get("line4", "") or "")
-    value = str(payload.get("value", "") or "")
-    label = str(payload.get("label", "") or "")
     show_timer = bool(payload.get("showTimer", False))
     timer_start_ms = payload.get("timerStartMs", None)
+
+    leaderboard_entries = payload.get("leaderboard", []) or []
+    big_mode = str(payload.get("bigMode", "timer") or "timer")
+    big_value = str(payload.get("value", "") or "")
 
     if mode == "panelTest":
         return render_panel_test_frame(payload)
@@ -813,85 +880,21 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
         if hasattr(matrix, "set_enhance"):
             matrix.set_enhance(False)
         return render_icon_frame(payload)
-    
+
     if hasattr(matrix, "set_enhance"):
         matrix.set_enhance(True)
 
     frame = Image.new("RGB", (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(frame)
 
-    # -----------------------------
-    # BIG NUMBER MODE
-    # -----------------------------
-    if mode in ("bigNumber", "bigNumberLeaderboard"):
-        label_text = label or line1
-        value_text = str(value or "")[:3]
-        leaderboard_text = line3 or ""
-
-        label_font = safe_load_font(10)
-        value_font = safe_load_font(36)
-        footer_font = safe_load_font(7)
-
-        # top banner
-        if label_text:
-            draw_text_marquee(
-                draw,
-                label_text,
-                -1,
-                label_font,
-                (255, 220, 80),
-                width,
-                offset_x=marquee_offset_px(16),
-                gap=8,
-            )
-
-        # big center number
-        bbox = text_bbox(draw, value_text, value_font)
-        text_w = bbox[2] - bbox[0]
-
-        x = max(0, (width - text_w) // 2)
-
-        # keep the big number high enough to leave room for bottom text
-        y = 7
-        draw.text((x, y), value_text, font=value_font, fill=(255, 255, 255))
-
-        # optional bottom leaderboard / lap-times marquee
-        if mode == "bigNumberLeaderboard" and leaderboard_text:
-            draw_text_marquee(
-                draw,
-                leaderboard_text,
-                40,
-                footer_font,
-                (0, 255, 0),
-                width,
-                offset_x=marquee_offset_px(16),
-                gap=12,
-            )
-
-        return frame
-
-    # -----------------------------
-    # RACE INFO / TIMER MODE
-    # -----------------------------
-    if show_timer and timer_start_ms is not None:
-        try:
-            elapsed_ms = max(0, now_ms - int(timer_start_ms))
-        except Exception:
-            elapsed_ms = 0
-        total_s = elapsed_ms // 1000
-        timer_line = f"{total_s // 60}:{total_s % 60:02d}"
-    else:
-        timer_line = line2 or ""
-
-    # Keep the top line compact for a 48x48 board
-    header_text = line1
-    footer3 = line3 or ""
-    footer4 = line4.replace(" ", "")[:8]
-
     header_font = safe_load_font(10)
-    timer_font = safe_load_mono_font(18)
+    big_font = safe_load_mono_font(18)
     footer_font = safe_load_font(7)
 
+    header_text = line1
+    footer4 = line4.replace(" ", "")[:8] if line4 else ""
+
+    # top header marquee
     if header_text:
         draw_text_marquee(
             draw,
@@ -904,79 +907,72 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
             gap=8,
         )
 
-    if timer_line:
-        bbox = text_bbox(draw, timer_line, timer_font)
-        text_h = bbox[3] - bbox[1]
+    # center big value: timer or race number
+    center_text = ""
+    if big_mode == "timer":
+        if show_timer and timer_start_ms is not None:
+            try:
+                elapsed_ms = max(0, now_ms - int(timer_start_ms))
+            except Exception:
+                elapsed_ms = 0
+            total_s = elapsed_ms // 1000
+            center_text = f"{total_s // 60}:{total_s % 60:02d}"
+        else:
+            center_text = line2 or ""
+    else:
+        center_text = big_value or ""
 
+    if center_text:
+        bbox = text_bbox(draw, center_text, big_font)
+        text_h = bbox[3] - bbox[1]
         middle_top = 15
         middle_h = 18
         y = middle_top + max(0, (middle_h - text_h) // 2) - 1
 
         draw_text_centered_fixed(
             draw,
-            timer_line,
+            center_text,
             y,
-            timer_font,
+            big_font,
             (255, 255, 255),
             width,
             spacing=0
         )
 
+    # bottom line
     if mode == "raceInfoMarquee":
-        # normal timer/header logic still happens above this point if you want,
-        # but bottom line3 should scroll, not be truncated/centered
-        footer_font = safe_load_font(7)
-        marquee_text = line3 or "NO TIMES YET"
-
-        if header_text:
-            draw_text_marquee(
+        if leaderboard_entries:
+            segments = build_leaderboard_segments(leaderboard_entries)
+            draw_segmented_marquee(
                 draw,
-                header_text,
-                -1,
-                header_font,
-                (255, 220, 80),
+                segments,
+                40,
+                footer_font,
                 width,
                 offset_x=marquee_offset_px(16),
-                gap=8,
+                gap=18,
             )
-
-        if timer_line:
-            bbox = text_bbox(draw, timer_line, timer_font)
-            text_h = bbox[3] - bbox[1]
-            middle_top = 15
-            middle_h = 18
-            y = middle_top + max(0, (middle_h - text_h) // 2) - 1
-
-            draw_text_centered_fixed(
+        else:
+            draw_text_marquee(
                 draw,
-                timer_line,
-                y,
-                timer_font,
-                (255, 255, 255),
+                line3 or "NO TIMES YET",
+                40,
+                footer_font,
+                (0, 255, 0),
                 width,
-                spacing=0
+                offset_x=marquee_offset_px(16),
+                gap=12,
             )
-
-        draw_text_marquee(
-            draw,
-            marquee_text,
-            40,
-            footer_font,
-            (0, 255, 0),
-            width,
-            offset_x=marquee_offset_px(16),
-            gap=12,
-        )
-
         return frame
+
     if footer4:
         draw_text_centered(draw, footer4, 32, footer_font, (180, 180, 255), width)
 
-    if footer3 and mode != "raceInfoMarquee":
-        draw_text_centered(draw, footer3, 40, footer_font, (0, 255, 0), width)
+    if line3:
+        draw_text_centered(draw, line3, 40, footer_font, (0, 255, 0), width)
 
     return frame
-
+    
 def effect_startGateDisplay(initial_payload=None):
     payload = initial_payload if isinstance(initial_payload, dict) else {}
     last_render_key = None
