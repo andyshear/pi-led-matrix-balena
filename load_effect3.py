@@ -886,9 +886,57 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
     else:
         timer_line = line2 or ""
 
+    if mode == "raceInfoMarquee":
+        # normal timer/header logic still happens above this point if you want,
+        # but bottom line3 should scroll, not be truncated/centered
+        footer_font = safe_load_font(7)
+        marquee_text = line3 or "NO TIMES YET"
+
+        if header_text:
+            draw_text_marquee(
+                draw,
+                header_text,
+                -1,
+                header_font,
+                (255, 220, 80),
+                width,
+                offset_x=marquee_offset_px(16),
+                gap=8,
+            )
+
+        if timer_line:
+            bbox = text_bbox(draw, timer_line, timer_font)
+            text_h = bbox[3] - bbox[1]
+            middle_top = 15
+            middle_h = 18
+            y = middle_top + max(0, (middle_h - text_h) // 2) - 1
+
+            draw_text_centered_fixed(
+                draw,
+                timer_line,
+                y,
+                timer_font,
+                (255, 255, 255),
+                width,
+                spacing=0
+            )
+
+        draw_text_marquee(
+            draw,
+            marquee_text,
+            40,
+            footer_font,
+            (0, 255, 0),
+            width,
+            offset_x=marquee_offset_px(16),
+            gap=12,
+        )
+
+        return frame
+
     # Keep the top line compact for a 48x48 board
     header_text = line1
-    footer3 = line3.replace(" ", "")[:8]
+    # footer3 = line3.replace(" ", "")[:8]
     footer4 = line4.replace(" ", "")[:8]
 
     header_font = safe_load_font(10)
@@ -933,34 +981,26 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
 
     return frame
 
-
 def effect_startGateDisplay(initial_payload=None):
     payload = initial_payload if isinstance(initial_payload, dict) else {}
     last_render_key = None
-    marquee_offset = 0
 
     while not stop_event.is_set() and get_current_effect() == 'startGateDisplay':
         now_ms = int(time.time() * 1000)
         mode = str(payload.get("mode", "raceInfo") or "raceInfo")
 
-        marquee_modes = {"raceInfo", "raceInfoMarquee", "bigNumber", "bigNumberLeaderboard"}
-
         render_key = json.dumps({
             "payload": payload,
             "timerBucket": now_ms // 1000 if payload.get("showTimer") and payload.get("timerStartMs") is not None else None,
-            "marqueeBucket": marquee_offset if mode in marquee_modes else None,
+            "marqueeBucket": now_ms // 20 if mode in {"raceInfo", "raceInfoMarquee", "bigNumber", "bigNumberLeaderboard"} else None,
         }, sort_keys=True)
 
         if render_key != last_render_key:
-            frame = render_start_gate_frame(payload, marquee_offset=marquee_offset)
+            frame = render_start_gate_frame(payload)
             push_image_to_matrix(frame)
             last_render_key = render_key
 
-        if mode in marquee_modes:
-            marquee_offset += 1
-            matrix.delay(20)
-        else:
-            matrix.delay(80)
+        matrix.delay(20 if mode in {"raceInfo", "raceInfoMarquee", "bigNumber", "bigNumberLeaderboard"} else 80)
 
 
 def effect_startGateCountdown(_payload=None):
