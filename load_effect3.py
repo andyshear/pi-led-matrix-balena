@@ -328,6 +328,47 @@ def load_icon_image(path, width, height):
         print(f"[icon] failed to load {path}: {e}")
         return Image.new("RGB", (width, height), (0, 0, 0))
 
+def load_icon_rgba(payload: dict, width: int, height: int):
+    icon_key = str(payload.get("icon", "") or "").lower()
+    icon_path = str(payload.get("iconPath", "") or "").strip()
+
+    chosen_path = None
+
+    if icon_path and os.path.exists(icon_path):
+        chosen_path = icon_path
+    else:
+        path = ICON_MAP.get(icon_key)
+        if path and os.path.exists(path):
+            chosen_path = path
+        else:
+            fallback = ICON_MAP.get("icon")
+            if fallback and os.path.exists(fallback):
+                chosen_path = fallback
+
+    if not chosen_path:
+        return None
+
+    try:
+        img = Image.open(chosen_path).convert("RGBA")
+
+        px = img.load()
+        for y in range(img.height):
+            for x in range(img.width):
+                r, g, b, a = px[x, y]
+                if a == 0:
+                    continue
+                if r > 235 and g > 235 and b > 235:
+                    px[x, y] = (0, 0, 0, 0)
+
+        target_w = max(1, width - 10)
+        target_h = max(1, height - 10)
+        img.thumbnail((target_w, target_h), Image.Resampling.LANCZOS)
+
+        return img
+    except Exception as e:
+        print(f"[icon] failed to load rgba icon: {e}")
+        return None
+
 def draw_text_left(draw, text, x, y, font, fill):
     if not text:
         return
@@ -887,6 +928,22 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
     frame = Image.new("RGB", (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(frame)
 
+    show_background_icon = bool(payload.get("showBackgroundIcon", False))
+
+    if show_background_icon:
+        bg_icon = load_icon_rgba(payload, width, height)
+        if bg_icon is not None:
+            icon_x = (width - bg_icon.width) // 2
+            icon_y = (height - bg_icon.height) // 2 + 2
+
+            # dim the icon slightly so text stays readable
+            alpha = bg_icon.getchannel("A")
+            alpha = alpha.point(lambda p: int(p * 0.28))
+            bg_icon.putalpha(alpha)
+
+            frame.paste(bg_icon, (icon_x, icon_y), bg_icon)
+            draw = ImageDraw.Draw(frame)
+            
     header_font = safe_load_font(10)
     big_font = safe_load_mono_font(22)
     footer_font = safe_load_font(9)
