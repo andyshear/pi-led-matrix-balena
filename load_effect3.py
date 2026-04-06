@@ -888,8 +888,8 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
     draw = ImageDraw.Draw(frame)
 
     header_font = safe_load_font(10)
-    big_font = safe_load_mono_font(18)
-    footer_font = safe_load_font(7)
+    big_font = safe_load_mono_font(22)
+    footer_font = safe_load_font(9)
 
     header_text = line1
     footer4 = line4.replace(" ", "")[:8] if line4 else ""
@@ -972,7 +972,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
         draw_text_centered(draw, line3, 40, footer_font, (0, 255, 0), width)
 
     return frame
-    
+
 def effect_startGateDisplay(initial_payload=None):
     payload = initial_payload if isinstance(initial_payload, dict) else {}
     last_render_key = None
