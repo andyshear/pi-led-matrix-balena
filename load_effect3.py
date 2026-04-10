@@ -36,7 +36,7 @@ PANEL_H = 16
 LOGICAL_WIDTH = 48
 LOGICAL_HEIGHT = 48
 DUPLICATE_TO_BOTTOM = True
-CENTER_Y_OFFSET = -2
+CENTER_Y_OFFSET = -4
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -958,7 +958,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
             draw_text_marquee(
                 draw,
                 header_text,
-                0,
+                CENTER_Y_OFFSET,
                 header_font,
                 (255, 220, 80),
                 width,
@@ -998,7 +998,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
             spacing=0
         )
 
-    line3_y = 35
+    line3_y = 36
 
     if mode == "raceInfoMarquee":
         if leaderboard_entries:
