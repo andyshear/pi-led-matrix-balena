@@ -36,6 +36,7 @@ PANEL_H = 16
 LOGICAL_WIDTH = 48
 LOGICAL_HEIGHT = 48
 DUPLICATE_TO_BOTTOM = True
+CENTER_Y_OFFSET = -2
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -982,9 +983,10 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
     if center_text:
         bbox = text_bbox(draw, center_text, big_font)
         text_h = bbox[3] - bbox[1]
-        middle_top = 12
+        middle_top = 8
         middle_h = 22
-        y = middle_top + max(0, (middle_h - text_h) // 2) - 1
+
+        y = middle_top + max(0, (middle_h - text_h) // 2) - 1 + CENTER_Y_OFFSET
 
         draw_text_centered_fixed(
             draw,
@@ -996,7 +998,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
             spacing=0
         )
 
-    line3_y = 37  # moved up 3px from 40
+    line3_y = 35
 
     if mode == "raceInfoMarquee":
         if leaderboard_entries:
