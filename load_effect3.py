@@ -958,7 +958,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
             draw_text_marquee(
                 draw,
                 header_text,
-                CENTER_Y_OFFSET,
+                CENTER_Y_OFFSET + 1,
                 header_font,
                 (255, 220, 80),
                 width,
@@ -986,7 +986,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
         middle_top = 8
         middle_h = 22
 
-        y = middle_top + max(0, (middle_h - text_h) // 2) - 1 + CENTER_Y_OFFSET
+        y = middle_top + max(0, (middle_h - text_h) // 2) + CENTER_Y_OFFSET
 
         draw_text_centered_fixed(
             draw,
@@ -998,7 +998,7 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
             spacing=0
         )
 
-    line3_y = 36
+    line3_y = 37
 
     if mode == "raceInfoMarquee":
         if leaderboard_entries:
