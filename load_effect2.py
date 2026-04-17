@@ -408,40 +408,6 @@ def reset_times_state():
     _last_time_by_rider.clear()
 
 def effect_times(_initial_payload_ignored=None):
-    WIDTH, HEIGHT = pixel_width, pixel_height
-    NUM_LANES = 5
-    PANE_W = max(1, WIDTH // NUM_LANES)
-
-    font = ImageFont.load_default()
-    line_h = 8
-    Y_OFFSET = -2
-    NAME_Y = Y_OFFSET
-    TIME_Y = NAME_Y + line_h
-
-    IDLE_SLEEP_MS = 20
-    ROTATE_INTERVAL_MS = 900
-    STALE_RIDER_MS = 12000  # drop riders if they haven't been refreshed recently
-
-    rider_lane = {}
-    next_lane_toggle = 0
-    lane_roster = [[] for _ in range(NUM_LANES)]
-    lane_active_idx = [0 for _ in range(NUM_LANES)]
-    lane_next_rotate_at = [0 for _ in range(NUM_LANES)]
-    rider_rec = {}
-    rider_updated_at = {}
-
-    def clear_all_state():
-        nonlocal rider_lane, next_lane_toggle, lane_roster, lane_active_idx, lane_next_rotate_at, rider_rec, rider_updated_at
-        rider_lane = {}
-        next_lane_toggle = 0
-        lane_roster = [[] for _ in range(NUM_LANES)]
-        lane_active_idx = [0 for _ in range(NUM_LANES)]
-        lane_next_rotate_at = [0 for _ in range(NUM_LANES)]
-        rider_rec = {}
-        rider_updated_at = {}
-        laps_by_rider.clear()
-        _last_time_by_rider.clear()
-
     def parse_quad(payload):
         if isinstance(payload, dict):
             rider_data = payload.get("riderData", "")
@@ -456,19 +422,9 @@ def effect_times(_initial_payload_ignored=None):
             raise ValueError(f"Invalid rider data format: {rider_data!r} (expected 4 fields)")
         return parts[0], parts[1], parts[2], parts[3]
 
-    def is_valid_name(name: str) -> bool:
-        name = str(name or "").strip()
-        if not name:
-            return False
-        if name.startswith("__"):
-            return False
-        return True
-
     def is_valid_lap_time(lap_time: str) -> bool:
         lap_time = str(lap_time or "").strip()
-        if not lap_time:
-            return False
-        if lap_time == "-:--:--":
+        if not lap_time or lap_time == "-:--:--":
             return False
 
         parts = lap_time.split(":")
@@ -483,118 +439,53 @@ def effect_times(_initial_payload_ignored=None):
         except Exception:
             return False
 
-    def record_seen(name: str, lap_time: str, laps_str: str):
-        try:
-            laps_val = int(str(laps_str))
-        except Exception:
-            laps_val = laps_by_rider.get(name, 0)
-
-        laps_by_rider[name] = laps_val
-        _last_time_by_rider[name] = lap_time
-
     def fmt_mmss(total_ms: int) -> str:
         total_s = max(0, total_ms // 1000)
         m = total_s // 60
         s = total_s % 60
         return f"{m}:{s:02d}"
 
-    def draw_lane_placeholder(draw, pane_x0: int, top_text: str, bottom_text: str):
-        draw.text((pane_x0, NAME_Y), top_text, font=font, fill=(80, 160, 255))
-        draw.text((pane_x0, TIME_Y), bottom_text, font=font, fill=(140, 140, 140))
+    WIDTH, HEIGHT = pixel_width, pixel_height
+    NUM_LANES = 5
+    PANE_W = max(1, WIDTH // NUM_LANES)
 
-    def active_lane_bounds(timer_active: bool):
-        return (1 if timer_active else 0, NUM_LANES - 1)
+    font = ImageFont.load_default()
+    line_h = 8
+    Y_OFFSET = -2
+    NAME_Y = Y_OFFSET
+    TIME_Y = NAME_Y + line_h
 
-    def assign_lane_if_needed(name: str, first_lane: int, last_lane: int):
-        nonlocal next_lane_toggle
+    IDLE_SLEEP_MS = 20
+    ROTATE_INTERVAL_MS = 900
 
-        existing = rider_lane.get(name)
-        if existing is not None and first_lane <= existing <= last_lane:
-            return existing
+    rider_rec = {}              # name -> (bike, name, laps_str, lap_time)
+    rider_order = []            # newest first
+    lane_active_idx = [0 for _ in range(NUM_LANES)]
+    lane_next_rotate_at = [0 for _ in range(NUM_LANES)]
 
-        span = max(1, (last_lane - first_lane + 1))
-        lane = first_lane + (next_lane_toggle % span)
-        next_lane_toggle += 1
-        rider_lane[name] = lane
-        return lane
+    def touch_rider(name: str):
+        if name in rider_order:
+            rider_order.remove(name)
+        rider_order.insert(0, name)
 
-    def rebuild_lane_roster(timer_active: bool):
-        nonlocal lane_roster, lane_active_idx, lane_next_rotate_at
+    def get_lane_names(timer_active: bool):
+        rider_names = rider_order[:8]  # cap the working set
+        lane_names = [[] for _ in range(NUM_LANES)]
 
-        first_lane, last_lane = active_lane_bounds(timer_active)
-        new_roster = [[] for _ in range(NUM_LANES)]
+        start_lane = 1 if timer_active else 0
+        lane_span = NUM_LANES - start_lane
+        if lane_span <= 0:
+            return lane_names
 
-        ordered_names = sorted(
-            rider_rec.keys(),
-            key=lambda name: rider_updated_at.get(name, 0),
-            reverse=True
-        )
+        for idx, name in enumerate(rider_names):
+            lane = start_lane + (idx % lane_span)
+            lane_names[lane].append(name)
 
-        for name in ordered_names:
-            lane = assign_lane_if_needed(name, first_lane, last_lane)
-            if name not in new_roster[lane]:
-                new_roster[lane].append(name)
-
-        lane_roster = new_roster
-
-        for lane in range(NUM_LANES):
-            roster_len = len(lane_roster[lane])
-            if roster_len == 0:
-                lane_active_idx[lane] = 0
-                lane_next_rotate_at[lane] = 0
-            else:
-                lane_active_idx[lane] = min(lane_active_idx[lane], roster_len - 1)
-                if lane_next_rotate_at[lane] == 0:
-                    lane_next_rotate_at[lane] = int(time.time() * 1000) + ROTATE_INTERVAL_MS
-
-    def set_active_to(name: str, lane: int):
-        now_ms = int(time.time() * 1000)
-
-        if name not in lane_roster[lane]:
-            lane_roster[lane].insert(0, name)
-
-        try:
-            idx = lane_roster[lane].index(name)
-        except ValueError:
-            idx = 0
-
-        lane_active_idx[lane] = idx
-        lane_next_rotate_at[lane] = now_ms + ROTATE_INTERVAL_MS
-
-    def prune_stale_riders(now_ms: int):
-        stale_names = [
-            name
-            for name, updated_at in rider_updated_at.items()
-            if now_ms - updated_at > STALE_RIDER_MS
-        ]
-
-        if not stale_names:
-            return False
-
-        for name in stale_names:
-            rider_updated_at.pop(name, None)
-            rider_rec.pop(name, None)
-            rider_lane.pop(name, None)
-            laps_by_rider.pop(name, None)
-            _last_time_by_rider.pop(name, None)
-
-        for lane in range(NUM_LANES):
-            lane_roster[lane] = [name for name in lane_roster[lane] if name in rider_rec]
-            if lane_roster[lane]:
-                lane_active_idx[lane] = min(lane_active_idx[lane], len(lane_roster[lane]) - 1)
-            else:
-                lane_active_idx[lane] = 0
-                lane_next_rotate_at[lane] = 0
-
-        return True
+        return lane_names
 
     while not stop_event.is_set() and get_current_effect() == "times":
         now_ms = int(time.time() * 1000)
         timer_active = race_timer_start_ms is not None
-        riders_first_lane, riders_last_lane = active_lane_bounds(timer_active)
-
-        consumed_any = False
-        layout_changed = False
 
         while True:
             try:
@@ -602,71 +493,47 @@ def effect_times(_initial_payload_ignored=None):
             except queue.Empty:
                 break
 
-            consumed_any = True
-
             try:
-                if isinstance(payload, dict):
-                    if payload.get("reset") is True:
-                        clear_all_state()
-                        layout_changed = True
-                        continue
-
-                    if payload.get("clear") is True:
-                        clear_all_state()
-                        layout_changed = True
-                        continue
+                if isinstance(payload, dict) and payload.get("reset") is True:
+                    rider_rec = {}
+                    rider_order = []
+                    lane_active_idx = [0 for _ in range(NUM_LANES)]
+                    lane_next_rotate_at = [0 for _ in range(NUM_LANES)]
+                    continue
 
                 bike, name, laps_str, lap_time = parse_quad(payload)
 
-                if not is_valid_name(name):
+                if not name or name.startswith("__"):
                     continue
 
-                # ignore empty placeholder updates from node
                 if not is_valid_lap_time(lap_time):
                     continue
 
-                record_seen(name, lap_time, laps_str)
                 rider_rec[name] = (bike, name, laps_str, lap_time)
-                rider_updated_at[name] = now_ms
-
-                lane = assign_lane_if_needed(name, riders_first_lane, riders_last_lane)
-
-                if name not in lane_roster[lane]:
-                    lane_roster[lane].append(name)
-
-                set_active_to(name, lane)
-
+                touch_rider(name)
             except Exception as e:
                 print(f"[times] Skip invalid payload={payload!r}: {e}")
 
-        if prune_stale_riders(now_ms):
-            layout_changed = True
+        lane_names = get_lane_names(timer_active)
 
-        if layout_changed:
-            rebuild_lane_roster(timer_active)
-
-        # if timer lane availability changed, rebuild to push riders over correctly
-        current_expected_first_lane = 1 if timer_active else 0
-        for name, lane in list(rider_lane.items()):
-            if lane < current_expected_first_lane:
-                layout_changed = True
-                break
-
-        if layout_changed:
-            rebuild_lane_roster(timer_active)
-
-        for lane in range(riders_first_lane, riders_last_lane + 1):
-            if not lane_roster[lane]:
+        for lane in range(NUM_LANES):
+            if not lane_names[lane]:
+                lane_active_idx[lane] = 0
+                lane_next_rotate_at[lane] = 0
                 continue
 
-            if now_ms >= lane_next_rotate_at[lane]:
-                lane_active_idx[lane] = (lane_active_idx[lane] + 1) % len(lane_roster[lane])
+            if lane_active_idx[lane] >= len(lane_names[lane]):
+                lane_active_idx[lane] = 0
+
+            if lane_next_rotate_at[lane] == 0:
+                lane_next_rotate_at[lane] = now_ms + ROTATE_INTERVAL_MS
+            elif now_ms >= lane_next_rotate_at[lane]:
+                lane_active_idx[lane] = (lane_active_idx[lane] + 1) % len(lane_names[lane])
                 lane_next_rotate_at[lane] = now_ms + ROTATE_INTERVAL_MS
 
         frame = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
         draw = ImageDraw.Draw(frame)
 
-        # timer lane
         if timer_active:
             elapsed_ms = now_ms - race_timer_start_ms
             t_str = fmt_mmss(elapsed_ms)
@@ -678,31 +545,20 @@ def effect_times(_initial_payload_ignored=None):
             else:
                 draw.text((pane_x0, NAME_Y), t_str, font=font, fill=(255, 255, 255))
 
-        # rider panes
-        for lane in range(riders_first_lane, riders_last_lane + 1):
+        for lane in range(1 if timer_active else 0, NUM_LANES):
             pane_x0 = lane * PANE_W
 
-            if not lane_roster[lane]:
-                if timer_active:
-                    draw_lane_placeholder(draw, pane_x0, "WAIT", "TIME")
-                else:
-                    draw_lane_placeholder(draw, pane_x0, "NO", "TIME")
+            if not lane_names[lane]:
                 continue
 
-            active_idx = lane_active_idx[lane]
-            if active_idx >= len(lane_roster[lane]):
-                active_idx = 0
-                lane_active_idx[lane] = 0
-
-            active_name = lane_roster[lane][active_idx]
+            active_name = lane_names[lane][lane_active_idx[lane]]
             bike, nm, _laps_str, lap_time = rider_rec.get(active_name, ("", active_name, "", ""))
 
-            num_color = get_bike_color(bike)
-            draw.text((pane_x0, NAME_Y), nm, font=font, fill=num_color)
+            draw.text((pane_x0, NAME_Y), nm, font=font, fill=get_bike_color(bike))
             draw.text((pane_x0, TIME_Y), lap_time, font=font, fill=(255, 255, 255))
 
         push_image_to_matrix(frame)
-        matrix.delay(IDLE_SLEEP_MS if consumed_any or timer_active else 60)
+        matrix.delay(IDLE_SLEEP_MS)
 
 
 def render_panel_test_frame(payload: dict):
