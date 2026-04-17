@@ -402,48 +402,20 @@ def handle_timer_cmd(payload: dict):
         print(f"[timer] startMs={race_timer_start_ms} label={race_timer_label}")
 
 
-def reset_times_state():
-    global laps_by_rider, _last_time_by_rider
-    laps_by_rider.clear()
-    _last_time_by_rider.clear()
-
-def effect_times(_initial_payload_ignored=None):
-    def parse_quad(payload):
-        if isinstance(payload, dict):
-            rider_data = payload.get("riderData", "")
-        else:
-            rider_data = payload
-
-        if not isinstance(rider_data, str):
-            raise ValueError(f"Invalid rider payload type: {type(rider_data)}")
-
-        parts = [p.strip() for p in rider_data.split("-")]
+def effect_times(_initial_rider_data_ignored=None):
+    def parse_quad(payload: str):
+        parts = [p.strip() for p in payload.split('-')]
         if len(parts) != 4:
-            raise ValueError(f"Invalid rider data format: {rider_data!r} (expected 4 fields)")
+            raise ValueError(f"Invalid rider data format: {payload!r} (expected 4 fields)")
         return parts[0], parts[1], parts[2], parts[3]
 
-    def is_valid_lap_time(lap_time: str) -> bool:
-        lap_time = str(lap_time or "").strip()
-        if not lap_time or lap_time == "-:--:--":
-            return False
-
-        parts = lap_time.split(":")
-        if len(parts) != 3:
-            return False
-
+    def record_seen(name: str, lap_time: str, laps_str: str):
         try:
-            int(parts[0])
-            int(parts[1])
-            int(parts[2])
-            return True
+            laps_val = int(str(laps_str))
         except Exception:
-            return False
-
-    def fmt_mmss(total_ms: int) -> str:
-        total_s = max(0, total_ms // 1000)
-        m = total_s // 60
-        s = total_s % 60
-        return f"{m}:{s:02d}"
+            laps_val = laps_by_rider.get(name, 0)
+        laps_by_rider[name] = laps_val
+        _last_time_by_rider[name] = lap_time
 
     WIDTH, HEIGHT = pixel_width, pixel_height
     NUM_LANES = 5
@@ -458,82 +430,90 @@ def effect_times(_initial_payload_ignored=None):
     IDLE_SLEEP_MS = 20
     ROTATE_INTERVAL_MS = 900
 
-    rider_rec = {}              # name -> (bike, name, laps_str, lap_time)
-    rider_order = []            # newest first
+    rider_lane = {}
+    next_lane_toggle = 0
+    lane_roster = [[] for _ in range(NUM_LANES)]
     lane_active_idx = [0 for _ in range(NUM_LANES)]
     lane_next_rotate_at = [0 for _ in range(NUM_LANES)]
+    rider_rec = {}
 
-    def touch_rider(name: str):
-        if name in rider_order:
-            rider_order.remove(name)
-        rider_order.insert(0, name)
+    def assign_lane_if_new(name: str, first_lane: int, last_lane: int):
+        nonlocal next_lane_toggle
+        if name in rider_lane:
+            lane = rider_lane[name]
+            if lane < first_lane or lane > last_lane:
+                lane = first_lane + (next_lane_toggle % (last_lane - first_lane + 1))
+                next_lane_toggle += 1
+                rider_lane[name] = lane
+            return lane
 
-    def get_lane_names(timer_active: bool):
-        rider_names = rider_order[:8]  # cap the working set
-        lane_names = [[] for _ in range(NUM_LANES)]
+        span = (last_lane - first_lane + 1)
+        lane = first_lane + (next_lane_toggle % span)
+        next_lane_toggle += 1
+        rider_lane[name] = lane
+        if name not in lane_roster[lane]:
+            lane_roster[lane].append(name)
+        return lane
 
-        start_lane = 1 if timer_active else 0
-        lane_span = NUM_LANES - start_lane
-        if lane_span <= 0:
-            return lane_names
+    def set_active_to(name: str, lane: int):
+        try:
+            idx = lane_roster[lane].index(name)
+        except ValueError:
+            lane_roster[lane].append(name)
+            idx = len(lane_roster[lane]) - 1
+        lane_active_idx[lane] = idx
+        lane_next_rotate_at[lane] = int(time.time() * 1000) + ROTATE_INTERVAL_MS
 
-        for idx, name in enumerate(rider_names):
-            lane = start_lane + (idx % lane_span)
-            lane_names[lane].append(name)
+    def fmt_mmss(total_ms: int) -> str:
+        total_s = max(0, total_ms // 1000)
+        m = total_s // 60
+        s = total_s % 60
+        return f"{m}:{s:02d}"
 
-        return lane_names
+    def draw_lane_placeholder(draw, pane_x0: int, top_text: str, bottom_text: str):
+        draw.text((pane_x0, NAME_Y), top_text, font=font, fill=(80, 160, 255))
+        draw.text((pane_x0, TIME_Y), bottom_text, font=font, fill=(140, 140, 140))
 
-    while not stop_event.is_set() and get_current_effect() == "times":
+    while not stop_event.is_set() and get_current_effect() == 'times':
         now_ms = int(time.time() * 1000)
-        timer_active = race_timer_start_ms is not None
+        timer_active = (race_timer_start_ms is not None)
+
+        riders_first_lane = 1 if timer_active else 0
+        riders_last_lane = NUM_LANES - 1
 
         while True:
             try:
                 payload = times_queue.get_nowait()
             except queue.Empty:
                 break
-
             try:
-                if isinstance(payload, dict) and payload.get("reset") is True:
-                    rider_rec = {}
-                    rider_order = []
-                    lane_active_idx = [0 for _ in range(NUM_LANES)]
-                    lane_next_rotate_at = [0 for _ in range(NUM_LANES)]
-                    continue
-
                 bike, name, laps_str, lap_time = parse_quad(payload)
 
-                if not name or name.startswith("__"):
+                # ignore blank/system entries if you ever send one later
+                if not str(name).strip() or str(name).startswith("__"):
                     continue
 
-                if not is_valid_lap_time(lap_time):
-                    continue
-
+                record_seen(name, lap_time, laps_str)
                 rider_rec[name] = (bike, name, laps_str, lap_time)
-                touch_rider(name)
+
+                lane = assign_lane_if_new(name, riders_first_lane, riders_last_lane)
+                if name not in lane_roster[lane]:
+                    lane_roster[lane].append(name)
+                set_active_to(name, lane)
             except Exception as e:
-                print(f"[times] Skip invalid payload={payload!r}: {e}")
+                print(f"[times] Skip invalid rider_data={payload!r}: {e}")
 
-        lane_names = get_lane_names(timer_active)
-
-        for lane in range(NUM_LANES):
-            if not lane_names[lane]:
-                lane_active_idx[lane] = 0
-                lane_next_rotate_at[lane] = 0
+        for lane in range(riders_first_lane, riders_last_lane + 1):
+            if not lane_roster[lane]:
                 continue
-
-            if lane_active_idx[lane] >= len(lane_names[lane]):
-                lane_active_idx[lane] = 0
-
-            if lane_next_rotate_at[lane] == 0:
-                lane_next_rotate_at[lane] = now_ms + ROTATE_INTERVAL_MS
-            elif now_ms >= lane_next_rotate_at[lane]:
-                lane_active_idx[lane] = (lane_active_idx[lane] + 1) % len(lane_names[lane])
+            if now_ms >= lane_next_rotate_at[lane]:
+                lane_active_idx[lane] = (lane_active_idx[lane] + 1) % len(lane_roster[lane])
                 lane_next_rotate_at[lane] = now_ms + ROTATE_INTERVAL_MS
 
         frame = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
         draw = ImageDraw.Draw(frame)
 
+        # left timer lane during an active race
         if timer_active:
             elapsed_ms = now_ms - race_timer_start_ms
             t_str = fmt_mmss(elapsed_ms)
@@ -545,17 +525,25 @@ def effect_times(_initial_payload_ignored=None):
             else:
                 draw.text((pane_x0, NAME_Y), t_str, font=font, fill=(255, 255, 255))
 
-        for lane in range(1 if timer_active else 0, NUM_LANES):
+        # rider lanes or placeholders
+        for lane in range(riders_first_lane, riders_last_lane + 1):
             pane_x0 = lane * PANE_W
 
-            if not lane_names[lane]:
+            if not lane_roster[lane]:
+                if timer_active:
+                    draw_lane_placeholder(draw, pane_x0, "WAIT", "TIME")
+                else:
+                    draw_lane_placeholder(draw, pane_x0, "NO", "TIME")
                 continue
 
-            active_name = lane_names[lane][lane_active_idx[lane]]
+            active_name = lane_roster[lane][lane_active_idx[lane]]
             bike, nm, _laps_str, lap_time = rider_rec.get(active_name, ("", active_name, "", ""))
 
-            draw.text((pane_x0, NAME_Y), nm, font=font, fill=get_bike_color(bike))
-            draw.text((pane_x0, TIME_Y), lap_time, font=font, fill=(255, 255, 255))
+            num_color = get_bike_color(bike)
+            time_color = (255, 255, 255)
+
+            draw.text((pane_x0, NAME_Y), nm, font=font, fill=num_color)
+            draw.text((pane_x0, TIME_Y), lap_time, font=font, fill=time_color)
 
         push_image_to_matrix(frame)
         matrix.delay(IDLE_SLEEP_MS)
@@ -798,7 +786,7 @@ def apply_effect(effect_name, payload=None):
     global stop_event, current_effect_thread
 
     if effect_name == 'times' and get_current_effect() == 'times' and current_effect_thread is not None and current_effect_thread.is_alive():
-        if payload:
+        if isinstance(payload, str) and payload:
             times_queue.put(payload)
         return
 
@@ -811,7 +799,7 @@ def apply_effect(effect_name, payload=None):
     current_effect_thread = threading.Thread(target=effects[effect_name], args=(payload,))
     current_effect_thread.start()
 
-    if effect_name == 'times' and payload:
+    if effect_name == 'times' and isinstance(payload, str) and payload:
         times_queue.put(payload)
 
 
@@ -831,14 +819,6 @@ def listen_for_commands():
                 continue
 
             if effect_name == "startGateDisplay":
-                apply_effect(effect_name, data)
-                continue
-
-            if effect_name == "icon":
-                apply_effect(effect_name, data)
-                continue
-
-            if effect_name == "times":
                 apply_effect(effect_name, data)
                 continue
 
