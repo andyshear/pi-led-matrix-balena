@@ -487,9 +487,19 @@ def effect_times(_initial_rider_data_ignored=None):
             except queue.Empty:
                 break
             try:
+                if payload == "__CLEAR__":
+                    laps_by_rider.clear()
+                    _last_time_by_rider.clear()
+                    rider_lane = {}
+                    next_lane_toggle = 0
+                    lane_roster = [[] for _ in range(NUM_LANES)]
+                    lane_active_idx = [0 for _ in range(NUM_LANES)]
+                    lane_next_rotate_at = [0 for _ in range(NUM_LANES)]
+                    rider_rec = {}
+                    continue
+
                 bike, name, laps_str, lap_time = parse_quad(payload)
 
-                # ignore blank/system entries if you ever send one later
                 if not str(name).strip() or str(name).startswith("__"):
                     continue
 
