@@ -272,7 +272,7 @@ class VirtualMatrix():
         self.use_enhance = True
 
         print(
-            "VIRTUAL_MATRIX_INIT",
+            "VIRTUAL_MATRIX_INIT1",
             {
                 "width": pixel_width,
                 "height": pixel_height,
