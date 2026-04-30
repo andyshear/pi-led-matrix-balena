@@ -115,6 +115,50 @@ def effect_caution():
         matrix.delay(50)
     print("Exiting caution effect.")
 
+def effect_red():
+    """Red flag / track closed: flashing NO ENTRY symbol."""
+    width = 16
+    height = 16
+
+    def draw_no_entry(background_color, symbol_color):
+        matrix.reset(background_color)
+
+        cx = width // 2
+        cy = height // 2
+        radius = 6
+
+        # Draw circle outline
+        for y in range(height):
+            for x in range(width):
+                dx = x - cx
+                dy = y - cy
+                dist_sq = dx * dx + dy * dy
+
+                # Thin circle ring
+                if 30 <= dist_sq <= 45:
+                    matrix.pixel((x, y), symbol_color)
+
+        # Draw center horizontal bar
+        for y in range(cy - 2, cy + 3):
+            for x in range(3, width - 3):
+                matrix.pixel((x, y), symbol_color)
+
+    while not stop_event.is_set() and get_current_effect() == 'red':
+        # Frame 1: red background, white symbol
+        draw_no_entry((255, 0, 0), (255, 255, 255))
+        matrix.show()
+        matrix.delay(500)
+
+        if stop_event.is_set() or get_current_effect() != 'red':
+            break
+
+        # Frame 2: white background, red symbol
+        draw_no_entry((255, 255, 255), (255, 0, 0))
+        matrix.show()
+        matrix.delay(500)
+
+    print("Exiting red flag effect.")
+
 def effect_caution_left():
     """Red, yellow, repeat."""
     while not stop_event.is_set() and get_current_effect() == 'cautionLeft':
@@ -507,6 +551,7 @@ def effect_startGateCountdown():
 
 effects = {
     'caution': effect_caution,
+    'red': effect_red,
     'cautionRight': effect_caution_right,
     'cautionLeft': effect_caution_left,
     'clearAnimation': effect_clearAnimation,
