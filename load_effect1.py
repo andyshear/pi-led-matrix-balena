@@ -175,16 +175,16 @@ def effect_red():
         # RED background + WHITE symbol
         matrix.reset(matrix.color('red'))
         matrix.show()
-        matrix.delay(500)
+        matrix.delay(300)
 
         if stop_event.is_set() or get_current_effect() != 'red':
             break
 
         # Frame 2:
         # WHITE background + RED symbol
-        matrix.reset(matrix.color('red'))
+        matrix.reset()
         matrix.show()
-        matrix.delay(500)
+        matrix.delay(300)
 
     print("Exiting red flag effect.")
 
