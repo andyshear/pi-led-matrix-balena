@@ -115,7 +115,7 @@ def effect_caution():
         matrix.delay(50)
     print("Exiting caution effect.")
 
-def effect_red():
+def effect_red_animate():
     """Red flag / track closed: flashing NO ENTRY symbol."""
     width = 16
     height = 16
@@ -161,6 +161,28 @@ def effect_red():
         # Frame 2:
         # WHITE background + RED symbol
         draw_no_entry(WHITE, RED)
+        matrix.show()
+        matrix.delay(500)
+
+    print("Exiting red flag effect.")
+
+def effect_red():
+    """Red flag / track closed: flashing NO ENTRY symbol."""
+
+    while not stop_event.is_set() and get_current_effect() == 'red':
+
+        # Frame 1:
+        # RED background + WHITE symbol
+        matrix.reset(matrix.color('white'))
+        matrix.show()
+        matrix.delay(500)
+
+        if stop_event.is_set() or get_current_effect() != 'red':
+            break
+
+        # Frame 2:
+        # WHITE background + RED symbol
+       matrix.reset(matrix.color('white'))
         matrix.show()
         matrix.delay(500)
 
