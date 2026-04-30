@@ -121,7 +121,8 @@ def effect_red():
     height = 16
 
     # BGR COLORS (hardware is flipped)
-    RED = (255, 0, 0)
+    RED = (0, 0, 255)
+    REDFLIPPED = (255, 0, 0)
     WHITE = (255, 255, 255)
 
     def draw_no_entry(background_color, symbol_color):
@@ -150,7 +151,7 @@ def effect_red():
 
         # Frame 1:
         # RED background + WHITE symbol
-        draw_no_entry(RED, WHITE)
+        draw_no_entry(REDFLIPPED, WHITE)
         matrix.show()
         matrix.delay(500)
 
