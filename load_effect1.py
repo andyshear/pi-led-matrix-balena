@@ -173,7 +173,7 @@ def effect_red():
 
         # Frame 1:
         # RED background + WHITE symbol
-        matrix.reset(matrix.color('white'))
+        matrix.reset(matrix.color('red'))
         matrix.show()
         matrix.delay(500)
 
@@ -182,7 +182,7 @@ def effect_red():
 
         # Frame 2:
         # WHITE background + RED symbol
-       matrix.reset(matrix.color('white'))
+        matrix.reset(matrix.color('red'))
         matrix.show()
         matrix.delay(500)
 
