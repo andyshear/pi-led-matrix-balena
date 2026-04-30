@@ -121,7 +121,7 @@ def effect_red():
     height = 16
 
     # BGR COLORS (hardware is flipped)
-    RED = (0, 0, 255)
+    RED = (255, 0, 0)
     WHITE = (255, 255, 255)
 
     def draw_no_entry(background_color, symbol_color):
