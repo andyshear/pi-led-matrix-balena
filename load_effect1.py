@@ -120,22 +120,25 @@ def effect_red():
     width = 16
     height = 16
 
+    # BGR COLORS (hardware is flipped)
+    RED = (0, 0, 255)
+    WHITE = (255, 255, 255)
+
     def draw_no_entry(background_color, symbol_color):
         matrix.reset(background_color)
 
         cx = width // 2
         cy = height // 2
-        radius = 6
 
-        # Draw circle outline
+        # Draw circular ring
         for y in range(height):
             for x in range(width):
                 dx = x - cx
                 dy = y - cy
                 dist_sq = dx * dx + dy * dy
 
-                # Thin circle ring
-                if 30 <= dist_sq <= 45:
+                # Circle ring thickness
+                if 28 <= dist_sq <= 45:
                     matrix.pixel((x, y), symbol_color)
 
         # Draw center horizontal bar
@@ -144,16 +147,19 @@ def effect_red():
                 matrix.pixel((x, y), symbol_color)
 
     while not stop_event.is_set() and get_current_effect() == 'red':
-        # Frame 1: red background, white symbol
-        draw_no_entry((255, 0, 0), (255, 255, 255))
+
+        # Frame 1:
+        # RED background + WHITE symbol
+        draw_no_entry(RED, WHITE)
         matrix.show()
         matrix.delay(500)
 
         if stop_event.is_set() or get_current_effect() != 'red':
             break
 
-        # Frame 2: white background, red symbol
-        draw_no_entry((255, 255, 255), (255, 0, 0))
+        # Frame 2:
+        # WHITE background + RED symbol
+        draw_no_entry(WHITE, RED)
         matrix.show()
         matrix.delay(500)
 
