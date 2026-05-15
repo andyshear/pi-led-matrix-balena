@@ -403,11 +403,43 @@ def handle_timer_cmd(payload: dict):
 
 
 def effect_times(_initial_rider_data_ignored=None):
-    def parse_quad(payload: str):
-        parts = [p.strip() for p in payload.split('-')]
+    # def parse_quad(payload: str):
+    #     parts = [p.strip() for p in payload.split('-')]
+    #     if len(parts) != 4:
+    #         raise ValueError(f"Invalid rider data format: {payload!r} (expected 4 fields)")
+    #     return parts[0], parts[1], parts[2], parts[3]
+    def parse_rider_payload(payload):
+        if isinstance(payload, dict):
+            bike = str(payload.get("bike", "") or "")
+            rider_id = str(payload.get("riderId", "") or "")
+            display_name = str(payload.get("displayName", rider_id) or rider_id)
+            laps_str = str(payload.get("currentLaps", "0") or "0")
+            lap_time = str(payload.get("lapTime", "") or "")
+            marquee_name = bool(payload.get("marqueeName", False))
+            return bike, rider_id, display_name, laps_str, lap_time, marquee_name
+
+        parts = [p.strip() for p in str(payload).split('-')]
         if len(parts) != 4:
             raise ValueError(f"Invalid rider data format: {payload!r} (expected 4 fields)")
-        return parts[0], parts[1], parts[2], parts[3]
+        bike, name, laps_str, lap_time = parts
+        return bike, name, name, laps_str, lap_time, False
+    
+    def draw_marquee_text(draw, text, pane_x0, y, font, fill, pane_w, now_ms, speed_px_per_sec=18):
+        pane = Image.new("RGB", (pane_w, 8), (0, 0, 0))
+        pane_draw = ImageDraw.Draw(pane)
+
+        bbox = text_bbox(pane_draw, text, font)
+        text_w = bbox[2] - bbox[0]
+
+        if text_w <= pane_w:
+            pane_draw.text((0, 0), text, font=font, fill=fill)
+        else:
+            cycle_w = text_w + pane_w + 8
+            offset = int((now_ms * speed_px_per_sec / 1000) % cycle_w)
+            x = pane_w - offset
+            pane_draw.text((x, 0), text, font=font, fill=fill)
+
+        frame.paste(pane, (pane_x0, y))
 
     def record_seen(name: str, lap_time: str, laps_str: str):
         try:
@@ -498,13 +530,13 @@ def effect_times(_initial_rider_data_ignored=None):
                     rider_rec = {}
                     continue
 
-                bike, name, laps_str, lap_time = parse_quad(payload)
+                bike, name, display_name, laps_str, lap_time, marquee_name = parse_rider_payload(payload)
 
                 if not str(name).strip() or str(name).startswith("__"):
                     continue
 
                 record_seen(name, lap_time, laps_str)
-                rider_rec[name] = (bike, name, laps_str, lap_time)
+                rider_rec[name] = (bike, name, display_name, laps_str, lap_time, marquee_name)
 
                 lane = assign_lane_if_new(name, riders_first_lane, riders_last_lane)
                 if name not in lane_roster[lane]:
@@ -547,12 +579,18 @@ def effect_times(_initial_rider_data_ignored=None):
                 continue
 
             active_name = lane_roster[lane][lane_active_idx[lane]]
-            bike, nm, _laps_str, lap_time = rider_rec.get(active_name, ("", active_name, "", ""))
+            bike, nm, display_name, _laps_str, lap_time, marquee_name = rider_rec.get(
+                active_name,
+                ("", active_name, active_name, "", "", False)
+            )
 
             num_color = get_bike_color(bike)
             time_color = (255, 255, 255)
 
-            draw.text((pane_x0, NAME_Y), nm, font=font, fill=num_color)
+            if marquee_name:
+                draw_marquee_text(draw, display_name, pane_x0, NAME_Y, font, num_color, PANE_W, now_ms)
+            else:
+                draw.text((pane_x0, NAME_Y), nm, font=font, fill=num_color)
             draw.text((pane_x0, TIME_Y), lap_time, font=font, fill=time_color)
 
         push_image_to_matrix(frame)
