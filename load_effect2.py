@@ -432,7 +432,7 @@ def effect_times(_initial_rider_data_ignored=None):
         bbox = text_bbox(pane_draw, text, font)
         text_w = bbox[2] - bbox[0]
 
-        text_y = 0
+        text_y = -2
 
         if text_w <= pane_w:
             pane_draw.text((0, text_y), text, font=font, fill=fill)
