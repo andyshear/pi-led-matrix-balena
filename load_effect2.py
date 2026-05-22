@@ -459,7 +459,7 @@ def effect_times(_initial_rider_data_ignored=None):
 
     font = ImageFont.load_default()
     line_h = 8
-    Y_OFFSET = 0
+    Y_OFFSET = -2
     NAME_Y = Y_OFFSET
     TIME_Y = NAME_Y + line_h
 
