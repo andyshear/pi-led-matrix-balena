@@ -425,21 +425,25 @@ def effect_times(_initial_rider_data_ignored=None):
         return bike, name, name, laps_str, lap_time, False
     
     def draw_marquee_text(draw, text, pane_x0, y, font, fill, pane_w, now_ms, speed_px_per_sec=18):
-        pane = Image.new("RGB", (pane_w, 8), (0, 0, 0))
+        pane_h = 10
+        pane = Image.new("RGB", (pane_w, pane_h), (0, 0, 0))
         pane_draw = ImageDraw.Draw(pane)
 
         bbox = text_bbox(pane_draw, text, font)
         text_w = bbox[2] - bbox[0]
 
+        text_y = 0
+
         if text_w <= pane_w:
-            pane_draw.text((0, 0), text, font=font, fill=fill)
+            pane_draw.text((0, text_y), text, font=font, fill=fill)
         else:
             cycle_w = text_w + pane_w + 8
             offset = int((now_ms * speed_px_per_sec / 1000) % cycle_w)
             x = pane_w - offset
-            pane_draw.text((x, 0), text, font=font, fill=fill)
+            pane_draw.text((x, text_y), text, font=font, fill=fill)
 
-        frame.paste(pane, (pane_x0, y))
+        paste_y = max(0, y)
+        frame.paste(pane, (pane_x0, paste_y))
 
     def record_seen(name: str, lap_time: str, laps_str: str):
         try:
@@ -455,7 +459,7 @@ def effect_times(_initial_rider_data_ignored=None):
 
     font = ImageFont.load_default()
     line_h = 8
-    Y_OFFSET = -2
+    Y_OFFSET = 0
     NAME_Y = Y_OFFSET
     TIME_Y = NAME_Y + line_h
 
