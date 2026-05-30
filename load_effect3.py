@@ -988,15 +988,32 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
 
         y = middle_top + max(0, (middle_h - text_h) // 2) + CENTER_Y_OFFSET
 
-        draw_text_centered_fixed(
-            draw,
-            center_text,
-            y,
-            big_font,
-            (255, 255, 255),
-            width,
-            spacing=0
+        should_marquee_big_value = (
+            big_mode != "timer"
+            and len(str(center_text).strip()) > 2
         )
+
+        if should_marquee_big_value:
+            draw_text_marquee(
+                draw,
+                center_text,
+                y,
+                big_font,
+                (255, 255, 255),
+                width,
+                offset_x=marquee_offset_px(18),
+                gap=18,
+            )
+        else:
+            draw_text_centered_fixed(
+                draw,
+                center_text,
+                y,
+                big_font,
+                (255, 255, 255),
+                width,
+                spacing=0
+            )
 
     line3_y = 37
 
@@ -1042,9 +1059,18 @@ def effect_startGateDisplay(initial_payload=None):
         mode = str(payload.get("mode", "raceInfo") or "raceInfo")
         disable_header_marquee = bool(payload.get("disableHeaderMarquee", False))
 
+        big_mode = str(payload.get("bigMode", "timer") or "timer")
+        big_value = str(payload.get("value", "") or "")
+
+        animate_big_value_marquee = (
+            big_mode != "timer"
+            and len(big_value.strip()) > 2
+        )
+
         animate_fast = (
             mode in {"raceInfoMarquee", "bigNumber", "bigNumberLeaderboard"}
             or (mode == "raceInfo" and not disable_header_marquee)
+            or animate_big_value_marquee
         )
 
         render_key = json.dumps({
