@@ -224,6 +224,7 @@ ICON_MAP = {
     "aztec": os.path.join(BASE_DIR, "assets", "icons", "aztec.png"),
     "suika": os.path.join(BASE_DIR, "assets", "icons", "suika.png"),
     "manana": os.path.join(BASE_DIR, "assets", "icons", "manana.png"),
+    "finishlinePromotions": os.path.join(BASE_DIR, "assets", "icons", "finishlinePromotions.png"),
     "icon": os.path.join(BASE_DIR, "assets", "icons", "logo.png"),
 }
 
