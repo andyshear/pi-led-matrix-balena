@@ -402,6 +402,24 @@ def handle_timer_cmd(payload: dict):
         print(f"[timer] startMs={race_timer_start_ms} label={race_timer_label}")
 
 
+def build_big_text_strip(rider_number, lap_time, number_color, height):
+    font = ImageFont.load_default()
+    number_text = f"{rider_number} "
+    text = f"{number_text}{lap_time}"
+    measure = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    bounds = text_bbox(measure, text, font)
+    text_width = max(1, bounds[2] - bounds[0])
+    text_height = max(1, bounds[3] - bounds[1])
+    strip = Image.new("RGB", (text_width, text_height), (0, 0, 0))
+    strip_draw = ImageDraw.Draw(strip)
+    strip_draw.text((-bounds[0], -bounds[1]), text, font=font, fill=(255, 255, 255))
+    strip_draw.text((-bounds[0], -bounds[1]), number_text, font=font, fill=number_color)
+    content_bounds = strip.getbbox()
+    if content_bounds:
+        strip = strip.crop(content_bounds)
+    return strip.resize((max(1, round(strip.width * height / strip.height)), height), Image.NEAREST)
+
+
 def effect_times(_initial_rider_data_ignored=None):
     # def parse_quad(payload: str):
     #     parts = [p.strip() for p in payload.split('-')]
@@ -465,6 +483,11 @@ def effect_times(_initial_rider_data_ignored=None):
 
     IDLE_SLEEP_MS = 20
     ROTATE_INTERVAL_MS = 900
+    BIG_TEXT_SPEED = 24
+    BIG_TEXT_GAP = 16
+    big_text_marquee = False
+    big_text_strips = {}
+    lane_scroll_started_at = [0 for _ in range(NUM_LANES)]
 
     rider_lane = {}
     next_lane_toggle = 0
@@ -498,7 +521,16 @@ def effect_times(_initial_rider_data_ignored=None):
             lane_roster[lane].append(name)
             idx = len(lane_roster[lane]) - 1
         lane_active_idx[lane] = idx
-        lane_next_rotate_at[lane] = int(time.time() * 1000) + ROTATE_INTERVAL_MS
+        restart_lane_scroll(lane, int(time.time() * 1000))
+
+    def restart_lane_scroll(lane, now_ms):
+        lane_scroll_started_at[lane] = now_ms if lane_roster[lane] else 0
+        duration_ms = ROTATE_INTERVAL_MS
+        if big_text_marquee and lane_roster[lane]:
+            active_name = lane_roster[lane][lane_active_idx[lane]]
+            strip = big_text_strips[active_name]
+            duration_ms += int((strip.width + BIG_TEXT_GAP) * 1000 / BIG_TEXT_SPEED)
+        lane_next_rotate_at[lane] = now_ms + duration_ms
 
     def fmt_mmss(total_ms: int) -> str:
         total_s = max(0, total_ms // 1000)
@@ -531,8 +563,17 @@ def effect_times(_initial_rider_data_ignored=None):
                     lane_roster = [[] for _ in range(NUM_LANES)]
                     lane_active_idx = [0 for _ in range(NUM_LANES)]
                     lane_next_rotate_at = [0 for _ in range(NUM_LANES)]
+                    lane_scroll_started_at = [0 for _ in range(NUM_LANES)]
+                    big_text_strips = {}
                     rider_rec = {}
                     continue
+
+                if isinstance(payload, dict) and "bigTextMarquee" in payload:
+                    next_big_text_marquee = bool(payload["bigTextMarquee"])
+                    if next_big_text_marquee != big_text_marquee:
+                        big_text_marquee = next_big_text_marquee
+                        for lane in range(NUM_LANES):
+                            restart_lane_scroll(lane, now_ms)
 
                 bike, name, display_name, laps_str, lap_time, marquee_name = parse_rider_payload(payload)
 
@@ -540,12 +581,19 @@ def effect_times(_initial_rider_data_ignored=None):
                     continue
 
                 record_seen(name, lap_time, laps_str)
+                previous = rider_rec.get(name)
+                if previous is None or previous[0] != bike or previous[4] != lap_time:
+                    big_text_strips[name] = build_big_text_strip(name, lap_time, get_bike_color(bike), HEIGHT)
                 rider_rec[name] = (bike, name, display_name, laps_str, lap_time, marquee_name)
 
                 lane = assign_lane_if_new(name, riders_first_lane, riders_last_lane)
                 if name not in lane_roster[lane]:
                     lane_roster[lane].append(name)
-                set_active_to(name, lane)
+                if not big_text_marquee or lane_scroll_started_at[lane] == 0:
+                    set_active_to(name, lane)
+                elif previous is not None and previous[4] != lap_time:
+                    if lane_roster[lane][lane_active_idx[lane]] == name:
+                        restart_lane_scroll(lane, now_ms)
             except Exception as e:
                 print(f"[times] Skip invalid rider_data={payload!r}: {e}")
 
@@ -554,7 +602,7 @@ def effect_times(_initial_rider_data_ignored=None):
                 continue
             if now_ms >= lane_next_rotate_at[lane]:
                 lane_active_idx[lane] = (lane_active_idx[lane] + 1) % len(lane_roster[lane])
-                lane_next_rotate_at[lane] = now_ms + ROTATE_INTERVAL_MS
+                restart_lane_scroll(lane, now_ms)
 
         frame = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
         draw = ImageDraw.Draw(frame)
@@ -590,6 +638,17 @@ def effect_times(_initial_rider_data_ignored=None):
 
             num_color = get_bike_color(bike)
             time_color = (255, 255, 255)
+
+            if big_text_marquee:
+                strip = big_text_strips[active_name]
+                elapsed_ms = max(0, now_ms - lane_scroll_started_at[lane] - ROTATE_INTERVAL_MS)
+                offset = int(elapsed_ms * BIG_TEXT_SPEED / 1000)
+                pane = Image.new("RGB", (PANE_W, HEIGHT), (0, 0, 0))
+                cycle_width = strip.width + BIG_TEXT_GAP
+                for repeat_x in range(-offset, PANE_W, cycle_width):
+                    pane.paste(strip, (repeat_x, 0))
+                frame.paste(pane, (pane_x0, 0))
+                continue
 
             if marquee_name:
                 draw_marquee_text(draw, display_name, pane_x0, NAME_Y, font, num_color, PANE_W, now_ms)
