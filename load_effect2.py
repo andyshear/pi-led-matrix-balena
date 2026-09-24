@@ -486,6 +486,7 @@ def effect_times(_initial_rider_data_ignored=None):
     BIG_TEXT_SPEED = 24
     BIG_TEXT_GAP = 16
     big_text_marquee = False
+    name_marquee = None
     big_text_strips = {}
     lane_scroll_started_at = [0 for _ in range(NUM_LANES)]
 
@@ -529,7 +530,7 @@ def effect_times(_initial_rider_data_ignored=None):
         if big_text_marquee and lane_roster[lane]:
             active_name = lane_roster[lane][lane_active_idx[lane]]
             strip = big_text_strips[active_name]
-            duration_ms += int((strip.width + BIG_TEXT_GAP) * 1000 / BIG_TEXT_SPEED)
+            duration_ms = (strip.width + BIG_TEXT_GAP) * 1000 / BIG_TEXT_SPEED
         lane_next_rotate_at[lane] = now_ms + duration_ms
 
     def fmt_mmss(total_ms: int) -> str:
@@ -568,6 +569,9 @@ def effect_times(_initial_rider_data_ignored=None):
                     rider_rec = {}
                     continue
 
+                if isinstance(payload, dict) and not payload.get("riderId") and "marqueeName" in payload:
+                    name_marquee = bool(payload["marqueeName"])
+
                 if isinstance(payload, dict) and "bigTextMarquee" in payload:
                     next_big_text_marquee = bool(payload["bigTextMarquee"])
                     if next_big_text_marquee != big_text_marquee:
@@ -600,9 +604,10 @@ def effect_times(_initial_rider_data_ignored=None):
         for lane in range(riders_first_lane, riders_last_lane + 1):
             if not lane_roster[lane]:
                 continue
-            if now_ms >= lane_next_rotate_at[lane]:
+            while now_ms >= lane_next_rotate_at[lane]:
+                next_scroll_start = lane_next_rotate_at[lane] if big_text_marquee else now_ms
                 lane_active_idx[lane] = (lane_active_idx[lane] + 1) % len(lane_roster[lane])
-                restart_lane_scroll(lane, now_ms)
+                restart_lane_scroll(lane, next_scroll_start)
 
         frame = Image.new("RGB", (WIDTH, HEIGHT), (0, 0, 0))
         draw = ImageDraw.Draw(frame)
@@ -641,16 +646,23 @@ def effect_times(_initial_rider_data_ignored=None):
 
             if big_text_marquee:
                 strip = big_text_strips[active_name]
-                elapsed_ms = max(0, now_ms - lane_scroll_started_at[lane] - ROTATE_INTERVAL_MS)
-                offset = int(elapsed_ms * BIG_TEXT_SPEED / 1000)
+                elapsed_ms = max(0, now_ms - lane_scroll_started_at[lane])
                 pane = Image.new("RGB", (PANE_W, HEIGHT), (0, 0, 0))
                 cycle_width = strip.width + BIG_TEXT_GAP
-                for repeat_x in range(-offset, PANE_W, cycle_width):
-                    pane.paste(strip, (repeat_x, 0))
+                offset = int(elapsed_ms * BIG_TEXT_SPEED / 1000) % cycle_width
+                repeat_x = -offset
+                repeat_index = lane_active_idx[lane]
+                while repeat_x < PANE_W:
+                    repeat_name = lane_roster[lane][repeat_index]
+                    repeat_strip = big_text_strips[repeat_name]
+                    pane.paste(repeat_strip, (repeat_x, 0))
+                    repeat_x += repeat_strip.width + BIG_TEXT_GAP
+                    repeat_index = (repeat_index + 1) % len(lane_roster[lane])
                 frame.paste(pane, (pane_x0, 0))
                 continue
 
-            if marquee_name:
+            use_name_marquee = marquee_name if name_marquee is None else name_marquee
+            if use_name_marquee:
                 draw_marquee_text(draw, display_name, pane_x0, NAME_Y, font, num_color, PANE_W, now_ms)
             else:
                 draw.text((pane_x0, NAME_Y), nm, font=font, fill=num_color)

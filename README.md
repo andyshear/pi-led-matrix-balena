@@ -30,11 +30,11 @@ number keeps its bike color and the time stays white. Names are hidden in this
 mode; switching it off restores the normal two-line display and Name Marquee
 preference. The race timer pane keeps its existing layout when enabled.
 
-The listener sends `bigTextMarquee` in the `times` command's `riderData`.
+The listener sends `bigTextMarquee` and `marqueeName` in the `times` command's `riderData`.
 A settings-only payload updates existing riders without waiting for another lap:
 
 ```json
-{"effect":"times","riderData":{"bigTextMarquee":true}}
+{"effect":"times","riderData":{"bigTextMarquee":true,"marqueeName":false}}
 ```
 
 Rider payloads can also include the flag:
@@ -43,10 +43,17 @@ Rider payloads can also include the flag:
 {"effect":"times","riderData":{"bike":"yamaha","riderId":"#357","displayName":"#357 Rider Name","currentLaps":15,"lapTime":"1:05:77","bigTextMarquee":true}}
 ```
 
-The default remains the two-line layout. Large text pauses briefly, scrolls at
-24 pixels per second, and completes a cycle before the next rider in that pane.
+The default remains the two-line layout. Large text scrolls continuously at
+24 pixels per second without a pause at the loop boundary, and completes a cycle
+before the next rider in that pane.
 Repeated unchanged rider payloads do not restart the scroll. Race clears remove
 the cached text and riders while retaining the selected display mode.
+
+Rider payloads retain the full `displayName` even when names are hidden.
+To restore name scrolling immediately for cached riders, send a settings-only
+payload with `bigTextMarquee: false` and `marqueeName: true`. Setting
+`marqueeName: false` restores the number-only top row. Older senders that omit
+the settings-only `marqueeName` flag keep their per-rider marquee behavior.
 
 Compile verification: `python3 -m py_compile load_effect2.py`.
 For manual validation on a development display, pipe the JSON commands into
