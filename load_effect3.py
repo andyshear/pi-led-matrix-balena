@@ -4,6 +4,7 @@ import threading
 import time
 import os
 from collections import deque
+from functools import lru_cache
 import queue
 import numpy as np
 from src.led_matrix1 import Matrix, pixel_height, pixel_width
@@ -198,8 +199,60 @@ def draw_text_marquee(draw, text, y, font, fill, width, offset_x=0, gap=12):
         draw.text((x, y), full_text, font=font, fill=fill)
         x += loop_w
 
-def draw_text_centered_fixed(draw, text, y, font, fill, width, spacing=1):
+@lru_cache(maxsize=64)
+def fit_start_gate_timer_font(shape, width, height):
+    # Measure every digit so seconds cannot change the font size within a format.
+    measure = ImageDraw.Draw(Image.new("L", (1, 1)))
+    base_font = safe_load_mono_font(36)
+    if not hasattr(base_font, "font_variant"):
+        try:
+            base_font = ImageFont.truetype(os.path.join(BASE_DIR, "fonts", "dosis.ttf"), 36)
+        except OSError:
+            pass
+    characters = set(shape) | (set("0123456789") if "0" in shape else set())
+    for size in range(36, 0, -1):
+        font = base_font.font_variant(size=size) if hasattr(base_font, "font_variant") else base_font
+        bounds = {ch: text_bbox(measure, ch, font) for ch in characters}
+        digit_width = max((bounds[ch][2] - bounds[ch][0] for ch in "0123456789" if ch in bounds), default=0)
+        text_width = sum(digit_width if ch == "0" else bounds[ch][2] - bounds[ch][0] for ch in shape)
+        text_height = max(b[3] for b in bounds.values()) - min(b[1] for b in bounds.values())
+        if text_width <= max(1, width - 4) and text_height <= height:
+            break
+    return font, digit_width
+
+
+def draw_text_centered_fixed(draw, text, y, font, fill, width, spacing=1, fit_height=None):
     if not text:
+        return
+
+    if fit_height is not None:
+        if fit_height <= 0:
+            return
+        shape = "".join("0" if ch in "0123456789" else ch for ch in text)
+        font, digit_width = fit_start_gate_timer_font(shape, width, fit_height)
+        glyphs = []
+        cursor = 0
+        for ch in text:
+            bbox = text_bbox(draw, ch, font)
+            glyph_width = bbox[2] - bbox[0]
+            cell_width = digit_width if ch in "0123456789" else glyph_width
+            left = cursor + (cell_width - glyph_width) // 2
+            glyphs.append((ch, left, bbox))
+            cursor += cell_width
+        left = min(x for _, x, _ in glyphs)
+        right = max(x + b[2] - b[0] for _, x, b in glyphs)
+        top = min(b[1] for _, _, b in glyphs)
+        bottom = max(b[3] for _, _, b in glyphs)
+        mask = Image.new("L", (max(1, right - left), max(1, bottom - top)))
+        mask_draw = ImageDraw.Draw(mask)
+        for ch, x, bbox in glyphs:
+            mask_draw.text((x - left - bbox[0], -top), ch, font=font, fill=255)
+        ink_bounds = mask.getbbox()
+        if ink_bounds:
+            mask = mask.crop(ink_bounds)
+        # Only needed when a fixed bitmap fallback cannot provide a smaller font.
+        mask.thumbnail((max(1, width - 4), fit_height), Image.Resampling.NEAREST)
+        draw.bitmap(((width - mask.width) // 2, y + (fit_height - mask.height) // 2), mask, fill=fill)
         return
 
     char_widths = []
@@ -946,7 +999,8 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
             draw = ImageDraw.Draw(frame)
 
     header_font = safe_load_font(11)
-    big_font = safe_load_mono_font(36)
+    is_timer = big_mode in {"timer", "timerDown"}
+    big_font = None if is_timer else safe_load_mono_font(36)
     footer_font = safe_load_font(10)
 
     header_text = line1
@@ -968,29 +1022,46 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
             )
 
     center_text = ""
-    if big_mode == "timer":
+    if big_mode in {"timer", "timerDown"}:
         if show_timer and timer_start_ms is not None:
-            try:
-                elapsed_ms = max(0, now_ms - int(timer_start_ms))
-            except Exception:
-                elapsed_ms = 0
-            total_s = elapsed_ms // 1000
-            center_text = f"{total_s // 60}:{total_s % 60:02d}"
+            if big_mode == "timerDown":
+                center_text = line2 or ""
+                try:
+                    start_ms = int(timer_start_ms)
+                    end_ms = int(payload.get("timerEndMs"))
+                    if end_ms > start_ms:
+                        # A future selected moto holds its full duration until its start.
+                        remaining_ms = max(0, end_ms - max(start_ms, now_ms))
+                        total_s = (remaining_ms + 999) // 1000
+                        center_text = f"{total_s // 60:02d}:{total_s % 60:02d}"
+                except (TypeError, ValueError, OverflowError):
+                    pass
+            else:
+                try:
+                    elapsed_ms = max(0, now_ms - int(timer_start_ms))
+                except Exception:
+                    elapsed_ms = 0
+                total_s = elapsed_ms // 1000
+                center_text = f"{total_s // 60}:{total_s % 60:02d}"
         else:
             center_text = line2 or ""
     else:
         center_text = big_value or ""
 
     if center_text:
-        bbox = text_bbox(draw, center_text, big_font)
-        text_h = bbox[3] - bbox[1]
         middle_top = 8
         middle_h = 22
-
-        y = middle_top + max(0, (middle_h - text_h) // 2) + CENTER_Y_OFFSET
+        fit_height = None
+        if is_timer:
+            y = max(0, min(height, middle_top + CENTER_Y_OFFSET))
+            fit_height = min(middle_h, height - y)
+        else:
+            bbox = text_bbox(draw, center_text, big_font)
+            text_h = bbox[3] - bbox[1]
+            y = middle_top + max(0, (middle_h - text_h) // 2) + CENTER_Y_OFFSET
 
         should_marquee_big_value = (
-            big_mode != "timer"
+            big_mode not in {"timer", "timerDown"}
             and len(str(center_text).strip()) > 2
         )
 
@@ -1013,7 +1084,8 @@ def render_start_gate_frame(payload: dict, marquee_offset: int = 0):
                 big_font,
                 (255, 255, 255),
                 width,
-                spacing=0
+                spacing=0,
+                fit_height=fit_height,
             )
 
     line3_y = 37
@@ -1064,7 +1136,7 @@ def effect_startGateDisplay(initial_payload=None):
         big_value = str(payload.get("value", "") or "")
 
         animate_big_value_marquee = (
-            big_mode != "timer"
+            big_mode not in {"timer", "timerDown"}
             and len(big_value.strip()) > 2
         )
 
