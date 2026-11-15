@@ -448,6 +448,40 @@ def effect_icon(initial_payload=None):
         matrix.delay(16)  # smooth like your other display
 
 
+def effect_boot(_payload=None):
+    """Dim blue/white loading chase around every 16x16 LED panel."""
+    def perimeter(width, height):
+        return (
+            [(x, 0) for x in range(width)]
+            + [(width - 1, y) for y in range(1, height)]
+            + [(x, height - 1) for x in range(width - 2, -1, -1)]
+            + [(0, y) for y in range(height - 2, 0, -1)]
+        )
+
+    tiles = []
+    for y0 in range(0, pixel_height, PANEL_H):
+        for x0 in range(0, pixel_width, PANEL_W):
+            tile_w = min(PANEL_W, pixel_width - x0)
+            tile_h = min(PANEL_H, pixel_height - y0)
+            tiles.append((x0, y0, perimeter(tile_w, tile_h)))
+
+    phase = 0
+    while not stop_event.is_set() and get_current_effect() == 'boot':
+        matrix.reset()
+        for tile_index, (x0, y0, edge) in enumerate(tiles):
+            if not edge:
+                continue
+            head = (phase + tile_index * 5) % len(edge)
+            for trail in range(min(12, len(edge))):
+                x, y = edge[(head - trail) % len(edge)]
+                color = ((195, 240, 255) if trail == 0 else
+                         (0, max(12, 132 - trail * 11), max(28, 250 - trail * 19)))
+                matrix.pixel((x0 + x, y0 + y), color)
+        matrix.show()
+        stop_event.wait(0.065)
+        phase += 3
+
+
 def effect_error(_payload=None):
     width = 16
     height = 16
@@ -1225,6 +1259,7 @@ def get_bike_color(bike_name):
 
 
 effects = {
+    'boot': effect_boot,
     'caution': effect_caution,
     'cautionRight': effect_caution_right,
     'cautionLeft': effect_caution_left,
@@ -1266,9 +1301,16 @@ def apply_effect(effect_name, payload=None):
 
 def listen_for_commands():
     while True:
-        input_data = sys.stdin.readline().strip()
+        input_data = sys.stdin.readline()
+        if not input_data:
+            break
+        input_data = input_data.strip()
 
         if not input_data:
+            continue
+
+        if input_data in effects and input_data != 'timer':
+            apply_effect(input_data)
             continue
 
         try:
@@ -1277,6 +1319,8 @@ def listen_for_commands():
 
             if effect_name == "timer":
                 handle_timer_cmd(data)
+                if get_current_effect() == 'boot' and data.get('startMs') is not None:
+                    apply_effect('times')
                 continue
 
             if effect_name == "startGateDisplay":
@@ -1299,4 +1343,10 @@ def listen_for_commands():
 
 
 if __name__ == "__main__":
-    listen_for_commands()
+    try:
+        apply_effect("boot")
+        listen_for_commands()
+    finally:
+        stop_event.set()
+        if current_effect_thread is not None:
+            current_effect_thread.join()

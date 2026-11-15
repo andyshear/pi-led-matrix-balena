@@ -18,6 +18,9 @@ MESSAGE = "CAUTION"
 FONT_SIZE = 8  # Adjust as needed
 FONT_PATH = "path/to/font.ttf"  # Adjust the font path as necessary
 
+PANEL_W = 16
+PANEL_H = 16
+
 def set_current_effect(effect):
     global current_effect
     with effect_change_lock:
@@ -26,6 +29,40 @@ def set_current_effect(effect):
 def get_current_effect():
     with effect_change_lock:
         return current_effect
+
+def effect_boot():
+    """Dim blue/white loading chase around every 16x16 LED panel."""
+    def perimeter(width, height):
+        return (
+            [(x, 0) for x in range(width)]
+            + [(width - 1, y) for y in range(1, height)]
+            + [(x, height - 1) for x in range(width - 2, -1, -1)]
+            + [(0, y) for y in range(height - 2, 0, -1)]
+        )
+
+    tiles = []
+    for y0 in range(0, pixel_height, PANEL_H):
+        for x0 in range(0, pixel_width, PANEL_W):
+            tile_w = min(PANEL_W, pixel_width - x0)
+            tile_h = min(PANEL_H, pixel_height - y0)
+            tiles.append((x0, y0, perimeter(tile_w, tile_h)))
+
+    phase = 0
+    while not stop_event.is_set() and get_current_effect() == 'boot':
+        matrix.reset()
+        for tile_index, (x0, y0, edge) in enumerate(tiles):
+            if not edge:
+                continue
+            head = (phase + tile_index * 5) % len(edge)
+            for trail in range(min(12, len(edge))):
+                x, y = edge[(head - trail) % len(edge)]
+                color = ((195, 240, 255) if trail == 0 else
+                         (0, max(12, 132 - trail * 11), max(28, 250 - trail * 19)))
+                matrix.pixel((x0 + x, y0 + y), color)
+        matrix.show()
+        stop_event.wait(0.065)
+        phase += 3
+
 
 def effect_error():
     """System fault / reset required."""
@@ -579,6 +616,7 @@ def effect_startGateCountdown():
 
 
 effects = {
+    'boot': effect_boot,
     'caution': effect_caution,
     'red': effect_red,
     'cautionRight': effect_caution_right,
@@ -607,7 +645,10 @@ def apply_effect(effect_name):
 def listen_for_commands():
     """Continuously listen for new commands and apply effects accordingly."""
     while True:
-        new_effect = input("Enter new effect (caution, clear, clearAnimation, medical, lastLap) or 'exit' to quit: ")
+        try:
+            new_effect = input("Enter new effect (caution, clear, clearAnimation, medical, lastLap) or 'exit' to quit: ")
+        except EOFError:
+            break
         if new_effect == 'exit':
             if current_effect_thread is not None:
                 stop_event.set()
@@ -619,7 +660,13 @@ def listen_for_commands():
             print(f"Unknown effect: {new_effect}")
 
 if __name__ == "__main__":
-    initial_effect = sys.argv[1] if len(sys.argv) > 1 else None
-    if initial_effect:
-        apply_effect(initial_effect)
-    listen_for_commands()
+    try:
+        apply_effect("boot")
+        initial_effect = sys.argv[1] if len(sys.argv) > 1 else None
+        if initial_effect:
+            apply_effect(initial_effect)
+        listen_for_commands()
+    finally:
+        stop_event.set()
+        if current_effect_thread is not None:
+            current_effect_thread.join()
